@@ -76,6 +76,28 @@
 
     .empty { text-align: center; color: #888; }
 
+    /* 每個工項一個小框：工項、機具、廠商*人數 */
+    .work-row {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 8px;
+      margin-bottom: 8px;
+    }
+    .work-row input { margin-bottom: 6px; }
+    .work-sub { display: flex; gap: 6px; }
+    .work-sub input { margin-bottom: 0; }
+    .work-sub .vendor { flex: 2; }
+    .work-sub .count { flex: 1; }
+    .work-row button.remove {
+      width: auto;
+      margin: 6px 0 0;
+      padding: 6px 12px;
+      font-size: 14px;
+      background: #c0392b;
+    }
+    /* 紀錄裡的多個工項分行顯示 */
+    .record-line { white-space: pre-line; }
+
     /* 備份區的按鈕：藍灰色，和送出鈕區分 */
     button.backup { background: #445b78; margin-top: 8px; }
     .hint { color: #666; font-size: 14px; margin: 0 0 4px; }
@@ -105,11 +127,9 @@
         <option>大雨（停工）</option>
       </select>
 
-      <label for="workers">出工人數</label>
-      <input type="number" id="workers" min="0" inputmode="numeric" required>
-
-      <label for="work">施工項目</label>
-      <textarea id="work" rows="3" placeholder="例：2F 柱筋綁紮、模板組立" required></textarea>
+      <label>施工項目</label>
+      <div id="workItems"></div>
+      <button type="button" class="backup" id="addWork">＋ 新增工項</button>
 
       <label for="note">備註</label>
       <textarea id="note" rows="2" placeholder="選填"></textarea>
@@ -142,6 +162,82 @@
     // 抓出頁面上要用到的元素
     const form = document.getElementById("recordForm");
     const listEl = document.getElementById("recordList");
+
+    const workItemsEl = document.getElementById("workItems");
+
+    // 新增一組工項輸入框（工項、機具、廠商*人數）；第一組不給移除，確保至少有一組
+    function addWorkRow() {
+      const row = document.createElement("div");
+      row.className = "work-row";
+
+      const work = document.createElement("input");
+      work.type = "text";
+      work.className = "f-work";
+      work.placeholder = "工項　例：2F 柱筋綁紮";
+
+      const machine = document.createElement("input");
+      machine.type = "text";
+      machine.className = "f-machine";
+      machine.placeholder = "機具　例：吊車（選填）";
+
+      const sub = document.createElement("div");
+      sub.className = "work-sub";
+
+      const vendor = document.createElement("input");
+      vendor.type = "text";
+      vendor.className = "vendor f-vendor";
+      vendor.placeholder = "廠商名字";
+
+      const count = document.createElement("input");
+      count.type = "number";
+      count.className = "count f-count";
+      count.min = "0";
+      count.inputMode = "numeric";
+      count.placeholder = "人數";
+
+      sub.append(vendor, count);
+      row.append(work, machine, sub);
+
+      if (workItemsEl.children.length > 0) {
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "remove";
+        remove.textContent = "移除這個工項";
+        remove.addEventListener("click", function () { row.remove(); });
+        row.appendChild(remove);
+      }
+
+      workItemsEl.appendChild(row);
+      return work;
+    }
+
+    // 把一筆紀錄的施工內容轉成文字（畫面與 CSV 共用）；舊紀錄只有 work 文字
+    function workText(r) {
+      if (Array.isArray(r.items)) {
+        const many = r.items.length > 1;
+        return r.items.map(function (it, i) {
+          const lines = [(many ? (i + 1) + ". " : "") + it.work];
+          if (it.machine) lines.push("　　機具：" + it.machine);
+          if (it.vendor || it.count) lines.push("　　廠商：" + (it.vendor || "") + "*" + (it.count || 0));
+          return lines.join("\n");
+        }).join("\n");
+      }
+      const items = String(r.work || "").split("\n").filter(Boolean);
+      return items.length > 1
+        ? items.map(function (t, i) { return (i + 1) + ". " + t; }).join("\n")
+        : (items[0] || "");
+    }
+
+    // 清空成只剩一個空白工項欄
+    function resetWorkRows() {
+      workItemsEl.innerHTML = "";
+      addWorkRow();
+    }
+
+    document.getElementById("addWork").addEventListener("click", function () {
+      addWorkRow().focus();
+    });
+    resetWorkRows();
 
     // 從瀏覽器讀出所有紀錄；沒有資料或資料壞掉就回傳空陣列
     function loadRecords() {
@@ -188,7 +284,9 @@
 
         const work = document.createElement("div");
         work.className = "record-line";
-        work.textContent = "施工項目：" + r.work;
+        // 多行內容（多工項、機具、廠商）從下一行開始顯示
+        const text = workText(r);
+        work.textContent = "施工項目：" + (text.includes("\n") ? "\n" : "") + text;
 
         card.append(title, meta, work);
 
@@ -221,14 +319,33 @@
     form.addEventListener("submit", function (event) {
       event.preventDefault(); // 阻止瀏覽器預設的換頁動作
 
+      // 收集有填工項的各組（沒填工項的略過），至少要有一組
+      const itemList = Array.from(workItemsEl.querySelectorAll(".work-row"))
+        .map(function (row) {
+          return {
+            work: row.querySelector(".f-work").value.trim(),
+            machine: row.querySelector(".f-machine").value.trim(),
+            vendor: row.querySelector(".f-vendor").value.trim(),
+            count: Number(row.querySelector(".f-count").value) || 0
+          };
+        })
+        .filter(function (it) { return it.work; });
+      if (itemList.length === 0) {
+        alert("請至少填一個施工項目。");
+        return;
+      }
+      // 出工人數 = 各工項人數加總
+      const totalWorkers = itemList.reduce(function (sum, it) { return sum + it.count; }, 0);
+
       // 把表單內容包成一筆紀錄
       const record = {
         id: Date.now(), // 用時間當編號，刪除時用來辨認
         date: document.getElementById("date").value,
         project: document.getElementById("project").value.trim(),
         weather: document.getElementById("weather").value,
-        workers: document.getElementById("workers").value,
-        work: document.getElementById("work").value.trim(),
+        workers: totalWorkers,
+        items: itemList,
+        work: workText({ items: itemList }),
         note: document.getElementById("note").value.trim()
       };
 
@@ -237,8 +354,7 @@
       saveRecords(records);
 
       // 清空表單，但保留日期與工程名稱，方便連續輸入
-      document.getElementById("workers").value = "";
-      document.getElementById("work").value = "";
+      resetWorkRows();
       document.getElementById("note").value = "";
 
       render();
@@ -277,7 +393,7 @@
       loadRecords()
         .sort((a, b) => a.date.localeCompare(b.date))
         .forEach(function (r) {
-          rows.push([r.date, r.project, r.weather, r.workers, r.work, r.note]);
+          rows.push([r.date, r.project, r.weather, r.workers, workText(r), r.note]);
         });
       const csv = "﻿" + rows.map(function (row) { return row.map(cell).join(","); }).join("\r\n");
       downloadFile("工地紀錄_" + todayString() + ".csv", csv, "text/csv");
