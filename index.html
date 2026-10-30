@@ -216,6 +216,7 @@ nav.tabs button[aria-current="page"]::before{content:"";position:absolute;top:0;
 .dline .x{flex:none;background:none;border:0;color:var(--muted);padding:0 4px;font-size:15px}
 .dline.done .v{text-decoration:line-through;color:var(--muted)}
 .ptab .day-row{cursor:pointer}
+.ptab th.items{text-align:left}
 .ptab td.items{text-align:left;white-space:normal;min-width:160px}
 .sug{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
 .sug:first-of-type{border-top:0}
@@ -238,7 +239,7 @@ nav.tabs button[aria-current="page"]::before{content:"";position:absolute;top:0;
 <div class="wrap">
   <header class="top">
     <div class="demo"><b id="projName">未匯入</b><span id="projSub"></span><button id="reset" type="button">專案</button></div>
-    <div class="proj"><select id="areaSel" aria-label="切換工程"><option value="all">BC11 全部總覽</option><option value="pile">BC11基樁工程</option><option value="sub">BC11下構工程</option></select><span class="today">今天 <span class="num" id="todayTxt"></span></span></div>
+    <div class="proj"><select id="areaSel" aria-label="切換工程"><option value="all">BC11 全部總覽</option><option value="pile">BC11基樁工程</option><option value="sub">BC11下構工程</option><option value="temp">BC11假設工程</option><option value="tree">BC11移植工程</option></select><span class="today">今天 <span class="num" id="todayTxt"></span></span></div>
   </header>
   <main id="view" class="wrap"></main>
 </div>
@@ -259,7 +260,27 @@ const ICONS={
 const TABS=[["home","總覽"],["cal","月曆"],["log","每日紀錄"],["report","日報"],["material","材料"]];
 let INSP={"基樁":[],"下構":[]}; // 由專案設定決定
 let PAY_MANUAL=[]; // 手填計價項目，由專案設定決定
-const PAY_ITEMS=["圍籬施作","既有結構打除","樹木移植","地盤改良(JSG)"];
+const PAY_ITEMS=["圍籬施作","圍籬遷移","圍籬拆除","既有結構打除","地盤改良(JSG)"];
+// 上方選哪個工程，每日紀錄的工項就只顯示那個工程的
+const AREA_ITEMS=()=>({
+  pile:["鑽掘","鋼筋籠加工","混凝土澆置"],
+  sub:CAP_STEPS,
+  temp:["圍籬施作","圍籬遷移","圍籬拆除","既有結構打除","洗車台","臨時水電","施工便道","交維設施佈設","管線試挖/遷移"],
+  tree:["樹木移植"]
+});
+const AREA_NAME={pile:"基樁工程",sub:"下構工程",temp:"假設工程",tree:"移植工程"};
+const EXTRA_SHORT={"圍籬施作":"圍籬","圍籬遷移":"圍籬遷移","圍籬拆除":"圍籬拆除","既有結構打除":"打除","洗車台":"洗車台","臨時水電":"臨水電","施工便道":"便道","交維設施佈設":"交維","管線試挖/遷移":"管線","樹木移植":"移植"};
+const TREE_SPECIES=["榕樹","樟樹","茄苳","黑板樹","欖仁","小葉欖仁","台灣欒樹","羊蹄甲","大葉山欖","苦楝","棕櫚類"];
+function itemOptions(){
+  const A=AREA_ITEMS();
+  if(A[S.area]) return A[S.area].map(x=>`<option>${x}</option>`).join("");
+  return Object.entries(A).map(([k,a])=>`<optgroup label="${AREA_NAME[k]}">${a.map(x=>`<option>${x}</option>`).join("")}</optgroup>`).join("");
+}
+// 移植的米高直徑分級：用 Excel 設定裡的移植計價項目；沒有就用一般分級
+function treeClasses(){
+  const fromPay=PAY_MANUAL.filter(x=>/移植/.test(x.name)).map(x=>({code:x.code,label:x.name.replace(/^移植，?/,"").replace(/^\(喬木類，一次移植\)，/,"")}));
+  return fromPay.length?fromPay:["米高直徑＜10cm","10≦米高直徑＜15cm","15≦米高直徑＜20cm","20≦米高直徑＜25cm","25≦米高直徑＜30cm","30≦米高直徑＜35cm","35cm 以上"].map(l=>({code:"",label:l}));
+}
 const MACHINES=["搖管機","全套管機","吊車","挖土機","泵浦車","吊卡"];
 function crewFields(px,noMachine){
   return `<div class="grid2">
@@ -316,7 +337,7 @@ function applyCfg(){
   // 基樁施工版：每日紀錄只留這三個工項
   const KEEP=["鑽掘","鋼筋籠加工","混凝土澆置"];
   if(KEEP.every(k=>ITEMS.includes(k))) ITEMS=KEEP.slice();
-  SHORT=Object.fromEntries(its.map(x=>[x.name,x.short]));
+  SHORT={...EXTRA_SHORT,...Object.fromEntries(its.map(x=>[x.name,x.short]))};
   REASONS=c.lists.reasons;
   INSP={"基樁":c.lists.inspPile,"下構":c.lists.inspSub};
   PAY_MANUAL=c.lists.manualPay.map(m=>{const it=(c.payItems||[]).find(x=>x.code===m.code);return {code:m.code,name:m.name,unit:it?it.unit:""}});
@@ -423,6 +444,29 @@ function monthBlock(kind){
 }
 
 /* ---------- 全部總覽 ---------- */
+function vArea(a){
+  const items=AREA_ITEMS()[a], cur=TODAY.slice(0,7);
+  const rows=S.logs.filter(l=>items.includes(l.item)&&l.status==="施工").sort((x,y)=>y.date.localeCompare(x.date));
+  const pays=payGroup(rows);
+  let top;
+  if(a==="tree"){
+    const tr=rows.filter(l=>l.tree), total=tr.reduce((s,l)=>s+l.tree.count,0), month=tr.filter(l=>l.date.startsWith(cur)).reduce((s,l)=>s+l.tree.count,0);
+    const g={}; tr.forEach(l=>{const k=l.tree.species+"|"+l.tree.dia;g[k]=(g[k]||0)+l.tree.count});
+    top=`<div class="stats"><div class="stat"><span class="label">累計移植</span><span class="v">${total}<small>株</small></span></div>
+      <div class="stat"><span class="label">本月移植</span><span class="v">${month}<small>株</small></span></div>
+      <div class="stat"><span class="label">樹種</span><span class="v">${new Set(tr.map(l=>l.tree.species)).size}<small>種</small></span></div></div>
+      <section class="panel stack"><span class="label">依樹種、直徑統計</span>${Object.keys(g).length?`<div class="ptab"><div class="tbl"><table><thead><tr><th>樹種</th><th class="items">米高直徑</th><th>株數</th></tr></thead><tbody>${Object.entries(g).sort().map(([k,n])=>{const [sp,d]=k.split("|");return `<tr><td>${esc(sp)}</td><td class="items">${esc(d)}</td><td class="num">${n}</td></tr>`}).join("")}</tbody></table></div></div>`:`<p class="hint">還沒有移植紀錄。到「每日紀錄」新增，工項選樹木移植。</p>`}</section>`;
+  }else{
+    const m=rows.filter(l=>l.date.startsWith(cur));
+    top=`<div class="stats" style="grid-template-columns:1fr 1fr"><div class="stat"><span class="label">本月施作</span><span class="v">${m.length}<small>次</small></span></div>
+      <div class="stat"><span class="label">累計施作</span><span class="v">${rows.length}<small>次</small></span></div></div>`;
+  }
+  return `<div><h2>${AREA_NAME[a]}</h2><p class="sub">截至 ${TODAY}　·　工項：${items.join("、")}</p></div>
+  ${top}
+  <section class="panel stack"><span class="label">累計計價數量</span>
+    <div class="dsec">${pays.map(x=>`<div class="dline"><span class="k num">${esc(x.code)}</span><span class="v">${esc(x.name)}<br><b class="num">${fq(x.qty)}</b> ${esc(x.unit)}</span></div>`).join("")||`<p class="hint">還沒有計價數量</p>`}</div></section>
+  <section class="panel stack"><span class="label">最近施作</span><div>${rows.slice(0,20).map(logLine).join("")||`<p class="hint">還沒有紀錄</p>`}</div></section>`;
+}
 function vAll(){
   const cur=TODAY.slice(0,7), mo=+cur.slice(5);
   const bar=(a,b)=>`<div class="bar"><i style="width:${b?Math.min(a/b,1)*100:0}%"></i></div>`;
@@ -660,7 +704,7 @@ function dayPanel(ds){
     <form class="stack" id="planForm" hidden>
       <div class="grid2">
         <div class="field"><label for="pl-part">部位（連續排程時填第一支）</label><input id="pl-part" class="num" list="plparts" autocomplete="off" placeholder="例：P0209-2"><datalist id="plparts">${pileOpts}</datalist></div>
-        <div class="field"><label for="pl-item">工項</label><select id="pl-item">${ITEMS.map(x=>`<option>${x}</option>`).join("")}</select></div>
+        <div class="field"><label for="pl-item">工項</label><select id="pl-item">${itemOptions()}</select></div>
       </div>
       ${crewFields("pl",true)}
       <div class="grid3">
@@ -740,6 +784,7 @@ function logLine(l){
   let extra="";
   if((l.item==="混凝土澆置"||l.item==="基礎混凝土澆置")&&l.conc!=null){const pr=pierOf(l.part.replace(/-樁帽$/,""));const dv=pile?overVol(pile):(pr?pr.capVol:null);extra=`實際 ${f1(l.conc)} m³・${l.trucks||"—"} 車・取樣 ${l.samples||0} 組${dv?`（設計 ${f1(dv)} m³）`:""}`}
   if(l.status==="未施工") extra=`原因：${l.reason||"—"}`;
+  if(l.tree) extra+=(extra?"　":"")+`${l.tree.species}・${l.tree.dia}・${l.tree.count} 株`;
   payLines(l).forEach(x=>{extra+=(extra?"　":"")+`計價 ${fq(x.qty)} ${x.unit}`});
   if(l.note) extra+=(extra?"　":"")+l.note;
   const chip=l.status==="施工"?"ok":l.status==="預定"?"steel":"bad";
@@ -765,7 +810,7 @@ function vLog(){
   <form class="panel" id="rowForm" hidden>
     <div class="grid2">
       <div class="field"><label for="rf-part">部位編號</label><input id="rf-part" class="num" list="parts" autocomplete="off" placeholder="例：P0208-6"><datalist id="parts">${S.piles.filter(p=>["drill","pour","idle"].includes(pileStatus(p))&&canStart(pierOf(p.pier))).slice(0,60).map(p=>`<option value="${p.no}">`).join("")}${S.piers.map(p=>`<option value="${p.id}-樁帽">`).join("")}</datalist></div>
-      <div class="field"><label for="rf-item">工項</label><select id="rf-item">${ITEMS.map(x=>`<option>${x}</option>`).join("")}</select></div>
+      <div class="field"><label for="rf-item">工項</label><select id="rf-item">${itemOptions()}</select></div>
     </div>
     <div class="grid2">
       <div class="field"><label for="rf-status">狀態</label><select id="rf-status"><option>施工</option><option>未施工</option><option>預定</option></select></div>
@@ -784,8 +829,15 @@ function vLog(){
       <div class="field"><label for="rf-pay">計價項目</label><select id="rf-pay"><option value="">不計價</option>${PAY_MANUAL.map(x=>`<option value="${x.code}">${x.code} ${x.name}</option>`).join("")}</select></div>
       <div class="field"><label for="rf-payq">數量</label><input id="rf-payq" class="num" type="number" step="0.1" min="0" inputmode="decimal"></div>
     </div>
+    <div class="stack" id="rf-treeW" hidden>
+      <div class="grid2">
+        <div class="field"><label for="rf-species">樹種</label><input id="rf-species" list="rf-species-l" autocomplete="off" placeholder="選擇或輸入"><datalist id="rf-species-l">${TREE_SPECIES.map(x=>`<option value="${x}">`).join("")}</datalist></div>
+        <div class="field"><label for="rf-tcount">株數</label><input id="rf-tcount" class="num" type="number" min="1" inputmode="numeric" value="1"></div>
+      </div>
+      <div class="field"><label for="rf-dia">米高直徑（計價分級）</label><select id="rf-dia">${treeClasses().map((x,i)=>`<option value="${i}">${esc(x.label)}</option>`).join("")}</select></div>
+    </div>
     <div class="field"><label for="rf-note">說明</label><input id="rf-note" placeholder="選填"></div>
-    <p class="hint" id="rf-hint">基樁和樁帽澆置的計價數量會自動算（基樁依樁長、樁帽依鋼筋量和實際方數）；圍籬、打除、移植、JSG 在上面手填。</p>
+    <p class="hint" id="rf-hint">基樁和樁帽澆置的計價數量會自動算；移植依直徑分級自動計價；圍籬、打除在上面手填數量。</p>
     <div class="form-actions"><button class="btn ghost" type="button" id="cancelRow">取消</button><button class="btn primary" type="submit">儲存</button></div>
   </form>
   <section class="panel stack">
@@ -811,6 +863,7 @@ function toggleRowFields(){
   document.getElementById("rf-doneW").hidden=!(item==="鑽掘"&&st==="施工");
   document.getElementById("rf-cageW").hidden=!(item==="鋼筋籠加工"&&st==="施工");
   document.getElementById("rf-payW").hidden=!(PAY_ITEMS.includes(item)&&st==="施工");
+  document.getElementById("rf-treeW").hidden=!(item==="樹木移植"&&st==="施工");
   document.getElementById("rf-concW").hidden=!((item==="混凝土澆置"||item==="基礎混凝土澆置")&&st==="施工");
 }
 
@@ -830,7 +883,7 @@ function payLines(l){
            out.push({code:rb?rb.code:"（項次待補）",name:rb?rb.name+"（樁帽，依規格估算）":"樁帽鋼筋（依規格估算）",unit:"T",qty:pr.capRebar,part:l.part});
            out.push({code:cc?cc.code:"（項次待補）",name:cc?cc.name:"樁帽混凝土",unit:"M3",qty:l.conc,part:l.part})}
   }
-  if(l.payCode&&l.payQty){const m=PAY_MANUAL.find(x=>x.code===l.payCode);out.push({code:l.payCode,name:m?m.name:"",unit:m?m.unit:"",qty:l.payQty,part:l.part})}
+  if(l.payCode&&l.payQty){const m=PAY_MANUAL.find(x=>x.code===l.payCode);out.push({code:l.payCode,name:m?m.name:"",unit:(m&&m.unit)||(l.tree?"株":""),qty:l.payQty,part:l.part})}
   return out;
 }
 function payGroup(rows){
@@ -853,7 +906,7 @@ function reportText(d){
   const done=rows.filter(l=>l.status==="施工"), stop=rows.filter(l=>l.status==="未施工");
   const next=S.logs.filter(l=>l.date===addDays(d,1)&&l.status==="預定");
   let t=`${d}\n上午：${w[0]||"—"} 下午：${w[1]||"—"}\n今日施作:\n`;
-  t+=done.length?done.map((l,i)=>`${i+1}.${l.part} ${l.item}${l.crew?" "+l.crew:""}`).join("\n"):"（無）";
+  t+=done.length?done.map((l,i)=>`${i+1}.${l.part} ${l.item}${l.tree?`（${l.tree.species} ${l.tree.dia} ${l.tree.count}株）`:""}${l.crew?" "+l.crew:""}`).join("\n"):"（無）";
   if(stop.length) t+=`\n未施作:\n`+stop.map((l,i)=>`${i+1}.${l.part} ${l.item}（${l.reason||"—"}）`).join("\n");
   done.filter(l=>(l.item==="混凝土澆置"||l.item==="基礎混凝土澆置")&&l.conc!=null).forEach(l=>{
     const p=pileOf(l.part), pr=pierOf(l.part.replace(/-樁帽$/,""));
@@ -888,6 +941,7 @@ function sugBlock(d){
 /* ---------- 材料 ---------- */
 function vMaterial(){
   const ms=S.materials.filter(m=>S.area==="all"||m.area===S.area), manual=ms.filter(m=>!m.auto);
+  if(!ms.length) return `<div><h2>材料</h2><p class="sub">${AREA_NAME[S.area]||""}目前沒有材料項目，要追蹤哪些材料跟我說。</p></div>`;
   return `<div class="head-row"><div><h2>材料</h2><p class="sub">設計量、累計進場與使用量</p></div><button class="btn primary" type="button" id="newMat">＋ 登記</button></div>
   <form class="panel" id="matForm" hidden>
     <div class="field"><label for="mf-name">材料</label><select id="mf-name">${manual.map((m,i)=>`<option value="${i}">${esc(m.name)}（${m.unit}）</option>`).join("")}</select></div>
@@ -912,7 +966,7 @@ function render(o={}){
   document.getElementById("projName").textContent=S.cfg?S.cfg.meta.name:"未匯入";
   document.getElementById("todayTxt").textContent=TODAY;
   const v=document.getElementById("view");
-  v.innerHTML=(!S.cfg||S.tab==="proj")?vProj():S.tab==="cal"?vCal():S.tab==="log"?vLog():S.tab==="report"?vReport():S.tab==="material"?vMaterial():S.area==="sub"?vSub():S.area==="all"?vAll():(S.pileView==="list"?vPile():vHome());
+  v.innerHTML=(!S.cfg||S.tab==="proj")?vProj():S.tab==="cal"?vCal():S.tab==="log"?vLog():S.tab==="report"?vReport():S.tab==="material"?vMaterial():S.area==="sub"?vSub():(S.area==="temp"||S.area==="tree")?vArea(S.area):S.area==="all"?vAll():(S.pileView==="list"?vPile():vHome());
   save();
   if(o.focus){const el=document.getElementById("pile-"+o.focus);if(el){el.scrollIntoView({block:"center"});el.style.outline="2px solid var(--accent)"}}
 }
@@ -1012,6 +1066,12 @@ document.addEventListener("submit",e=>{
         if(item==="基礎混凝土澆置"){const c=parseFloat(g("rf-conc"));if(!(c>0)){toast("請填實際澆置方量");return}Object.assign(row,{conc:c,trucks:+g("rf-trucks")||null,samples:+g("rf-samples")||0});pr.capConc=c}
         pr.capDates[item]=S.logDate; if(i>pr.cap) pr.cap=i;
       }
+    }
+    if(item==="樹木移植"&&status==="施工"){
+      const sp=g("rf-species"), n=Math.round(+g("rf-tcount")||0), c=treeClasses()[+g("rf-dia")];
+      if(!sp){toast("請填樹種");return} if(!(n>0)){toast("請填株數");return}
+      row.tree={species:sp,dia:c.label,count:n};
+      if(c.code){row.payCode=c.code;row.payQty=n}
     }
     if(PAY_ITEMS.includes(item)&&status==="施工"&&g("rf-pay")){const q=parseFloat(g("rf-payq"));if(!(q>0)){toast("請填計價數量");return}row.payCode=g("rf-pay");row.payQty=q}
     S.logs.push(row); render(); toast("已新增紀錄");
