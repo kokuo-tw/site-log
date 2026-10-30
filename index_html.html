@@ -1,0 +1,1213 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>[hidden]{display:none!important}body{margin:0}</style>
+<title>工地施工管制</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: one phone-width column, project bar on top, bottom tab bar like a field app */
+:root{
+  --bg:#ECEFEE; --surface:#FFFFFF; --sunk:#F4F6F5; --ink:#1E2422; --muted:#5C6763; --line:#D2D8D6;
+  --accent:#E0A100; --on-accent:#1E2422; --steel:#2C5B7A; --steel-soft:#DCE7EF;
+  --bad:#B42318; --bad-soft:#FDE6E3; --warn:#9A6200; --warn-soft:#FDF1D6; --ok:#1E7B4A; --ok-soft:#DDF2E6;
+  --idle:#7A8581; --idle-soft:#E6EAE8;
+  --f-display:"Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --f-body:"Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --f-data:"IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141817; --surface:#1D2321; --sunk:#181D1C; --ink:#E6EBE9; --muted:#9AA5A1; --line:#313937;
+  --accent:#F0B429; --on-accent:#1A1E1D; --steel:#86B5D6; --steel-soft:#22323D;
+  --bad:#F48B80; --bad-soft:#3A2220; --warn:#F2C25B; --warn-soft:#352C17; --ok:#6FD39A; --ok-soft:#1C3326;
+  --idle:#8C9692; --idle-soft:#262D2B; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141817; --surface:#1D2321; --sunk:#181D1C; --ink:#E6EBE9; --muted:#9AA5A1; --line:#313937;
+  --accent:#F0B429; --on-accent:#1A1E1D; --steel:#86B5D6; --steel-soft:#22323D;
+  --bad:#F48B80; --bad-soft:#3A2220; --warn:#F2C25B; --warn-soft:#352C17; --ok:#6FD39A; --ok-soft:#1C3326;
+  --idle:#8C9692; --idle-soft:#262D2B; color-scheme:dark}
+
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--ink)}
+body{font-family:var(--f-body);font-size:15px;line-height:1.55;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));
+  padding-block:0 calc(88px + env(safe-area-inset-bottom, 0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top, 0px);z-index:10;background:var(--bg)}
+.wrap{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--steel);outline-offset:2px}
+.num{font-family:var(--f-data);font-variant-numeric:tabular-nums}
+
+.top{position:sticky;top:env(safe-area-inset-top, 0px);z-index:5;background:var(--bg);padding-block:12px 10px;display:flex;flex-direction:column;gap:6px;border-bottom:1px solid var(--line)}
+.demo{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+.demo b{background:var(--accent);color:var(--on-accent);font-weight:700;padding:1px 7px;border-radius:3px;letter-spacing:.05em}
+.demo button{margin-left:auto;background:none;border:1px solid var(--line);border-radius:6px;padding:3px 9px;font-size:12.5px;color:var(--muted)}
+.proj select{flex:1;min-width:0;appearance:none;background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23889' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 12px center;border:1px solid var(--line);border-radius:8px;padding:8px 34px 8px 12px;font-weight:900;font-size:16px}
+.proj{display:flex;align-items:center;gap:10px;justify-content:space-between}
+.proj b{font-size:16px;font-weight:900;min-width:0}
+.today{font-size:13px;color:var(--muted);white-space:nowrap}
+
+h2{font-family:var(--f-display);font-weight:900;font-size:20px;margin:6px 0 0;text-wrap:balance}
+.sub{color:var(--muted);font-size:13px;margin:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px}
+.stack{display:flex;flex-direction:column;gap:10px}
+.label{font-size:12px;color:var(--muted);letter-spacing:.06em}
+.head-row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+
+.prelist{display:flex;flex-direction:column;gap:4px;background:var(--sunk);border-radius:8px;padding:8px 10px}
+.prelist label{display:flex;align-items:center;gap:8px;font-size:14px}
+.prelist label input{width:18px;height:18px;accent-color:var(--ok)}
+.prog-row{display:grid;grid-template-columns:52px 1fr 96px;align-items:center;gap:10px;font-size:13px}
+.prog-row .num{text-align:right}
+.bar{height:12px;background:var(--sunk);border:1px solid var(--line);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--steel)}
+
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.chip.bad{background:var(--bad-soft);color:var(--bad)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}
+.chip.steel{background:var(--steel-soft);color:var(--steel)}
+.chip.idle{background:var(--idle-soft);color:var(--idle)}
+
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.stat .v{font-family:var(--f-data);font-size:21px;font-weight:600;line-height:1.2}
+.stat .v small{font-size:13px;color:var(--muted);font-family:var(--f-body);font-weight:500;margin-left:2px}
+
+/* overview map: one tile per pier, one dot per pile */
+.seg-title{font-size:12.5px;font-weight:700;color:var(--muted);margin-top:4px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:6px;align-items:start}
+.tile{display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 2px 4px;background:none;border:1px solid transparent;border-radius:6px}
+.tile.on{border-color:var(--accent);background:var(--sunk)}
+.tile.blocked .dots{opacity:.45}
+.tile.has-bad .tl{color:var(--bad);font-weight:700}
+.dots{display:grid;grid-template-columns:repeat(4,7px);gap:2px}
+.dots i{width:7px;height:7px;border-radius:2px;background:var(--line)}
+.dots i.s-drill{background:var(--steel)}
+.dots i.s-pour,.dots i.s-test{background:var(--warn)}
+.dots i.s-done{background:var(--ok)}
+.dots i.s-bad{background:var(--bad)}
+.tl{font-size:10px;color:var(--muted);line-height:1;font-family:var(--f-data)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:10px;height:10px;border-radius:2px;background:var(--line)}
+.legend i.s-drill{background:var(--steel)}.legend i.s-pour{background:var(--warn)}.legend i.s-done{background:var(--ok)}.legend i.s-bad{background:var(--bad)}
+
+.gd{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:12px}
+.cells{display:flex;flex-wrap:wrap;gap:6px}
+.cell{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-data);font-size:11.5px;font-weight:600;border:2px solid var(--line);background:var(--sunk);color:var(--muted);padding:0}
+.cell.s-drill{border-color:var(--steel);color:var(--steel);background:var(--steel-soft)}
+.cell.s-pour,.cell.s-test{border-color:var(--warn);color:var(--warn);background:var(--warn-soft)}
+.cell.s-done{border-color:var(--ok);background:var(--ok);color:var(--surface)}
+.cell.s-bad{border-color:var(--bad);background:var(--bad);color:var(--surface)}
+.pre{display:flex;flex-wrap:wrap;gap:6px}
+/* 下構: one tile per pile cap, 7 bars = 7 work steps */
+.ctile{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 2px 4px;border-radius:6px;border:1px solid var(--line);background:var(--sunk)}
+.ctile.on{outline:2px solid var(--accent);outline-offset:1px}
+.ctile.c-wait{opacity:.5;border-style:dashed}
+.ctile.c-ready{border-color:var(--steel)}
+.ctile.c-wip{border-color:var(--warn);background:var(--warn-soft)}
+.ctile.c-done{border-color:var(--ok);background:var(--ok-soft)}
+.segs{display:grid;grid-template-columns:repeat(7,4px);gap:1px}
+.segs i{width:4px;height:10px;background:var(--line);border-radius:1px}
+.segs i.f{background:var(--ok)}
+.ctile.c-wip .segs i.f{background:var(--warn)}
+.legend i.c-wait{background:var(--sunk);border:1px dashed var(--muted)}
+.legend i.c-ready{background:var(--sunk);border:1px solid var(--steel)}
+.legend i.c-wip{background:var(--warn-soft);border:1px solid var(--warn)}
+.legend i.c-done{background:var(--ok-soft);border:1px solid var(--ok)}
+.vsteps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;font-size:13.5px}
+.vsteps li{display:flex;justify-content:space-between;gap:10px;padding:5px 8px;border-radius:6px;color:var(--muted)}
+.vsteps li.on{background:var(--ok-soft);color:var(--ok);font-weight:700}
+.vsteps li.next{background:var(--steel-soft);color:var(--steel);font-weight:700}
+
+.list{display:flex;flex-direction:column;gap:10px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:13px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.card.flag{border-left:4px solid var(--warn)}
+.card.flag-bad{border-left:4px solid var(--bad)}
+.card h3{margin:0;font-size:16px;font-weight:700}
+.kv{display:grid;grid-template-columns:72px 1fr;gap:4px 10px;font-size:13.5px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;min-width:0}
+.note{font-size:13px;color:var(--muted)}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.step{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11.5px;color:var(--muted);text-align:center;padding:6px 2px;border-radius:6px;background:var(--sunk)}
+.step b{font-size:12.5px;color:var(--muted);font-weight:500}
+.step.on{background:var(--ok-soft)} .step.on b{color:var(--ok);font-weight:700}
+.step.now{background:var(--steel-soft)} .step.now b{color:var(--steel);font-weight:700}
+.step.bad{background:var(--bad-soft)} .step.bad b{color:var(--bad);font-weight:700}
+.conc{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;background:var(--sunk);border-radius:8px;padding:8px 10px}
+.conc div{display:flex;flex-direction:column;min-width:0}
+
+.logrow{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:10px 0;border-top:1px solid var(--line);font-size:14px}
+.logrow:first-child{border-top:0;padding-top:0}
+.logrow .what{font-weight:700}
+.logrow .crew,.logrow .extra{grid-column:1 / -1;font-size:13px;color:var(--muted)}
+
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 14px;font-weight:700;font-size:14px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.small{padding:5px 11px;font-size:13px}
+.btn.ghost{background:none}
+
+.seg{display:flex;background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:3px;gap:3px;overflow-x:auto}
+.seg button{flex:1;border:0;background:none;border-radius:6px;padding:6px 8px;font-size:13.5px;color:var(--muted);font-weight:500;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);font-weight:700;box-shadow:0 1px 2px rgb(0 0 0 / .12)}
+
+form.panel{display:flex;flex-direction:column;gap:12px;border-color:var(--accent)}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-size:13px;color:var(--muted)}
+.field input,.field select,.field textarea{background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:9px 11px;width:100%}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.form-actions{display:flex;gap:8px;justify-content:flex-end}
+.hint{font-size:12.5px;color:var(--muted);margin:0}
+.datebar{display:flex;align-items:center;gap:8px}
+.datebar input{flex:1;min-width:0;text-align:center;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px}
+.report{white-space:pre-wrap;font-family:var(--f-body);font-size:14.5px;line-height:1.7;background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:0;user-select:all;overflow-wrap:anywhere}
+.filter-chip{display:inline-flex;align-items:center;gap:6px;background:var(--steel-soft);color:var(--steel);border:0;border-radius:999px;padding:4px 10px;font-size:13px;font-weight:700;align-self:flex-start}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom, 0px));background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:999px;font-size:14px;z-index:20;white-space:nowrap}
+
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom, 0px);padding-left:max(8px, env(safe-area-inset-left, 0px));padding-right:max(8px, env(safe-area-inset-right, 0px))}
+nav.tabs .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
+nav.tabs button{background:none;border:0;padding:8px 2px 10px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12px;color:var(--muted);position:relative}
+nav.tabs svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav.tabs button[aria-current="page"]{color:var(--ink);font-weight:700}
+nav.tabs button[aria-current="page"]::before{content:"";position:absolute;top:0;left:28%;right:28%;height:3px;background:var(--accent);border-radius:0 0 3px 3px}
+.empty{color:var(--muted);text-align:center;padding:20px}
+.mrow{display:flex;align-items:center;gap:10px}
+.mbig{flex:1;display:flex;flex-direction:column;align-items:center;gap:0}
+.mbig .mm{font-size:13px;color:var(--muted)}
+.mbig .big{font-size:30px;font-weight:600;line-height:1.2}
+.mplan{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--muted);justify-content:center}
+.mplan input{width:72px;text-align:right;background:var(--sunk);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-family:var(--f-data);color:var(--ink)}
+/* 月曆 */
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+.cal .dow{font-size:11px;text-align:center;color:var(--muted);padding-bottom:2px}
+.cal .dow.sun,.day.sun .dn{color:var(--bad)}
+.day{min-height:62px;border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:3px;display:flex;flex-direction:column;gap:2px;text-align:left;min-width:0;font-size:10px;line-height:1.25}
+.day.pad{visibility:hidden}
+.day.today{border-color:var(--accent);border-width:2px}
+.day.sel{outline:2px solid var(--steel);outline-offset:1px}
+.day .dn{font-family:var(--f-data);font-size:12px;font-weight:600;display:flex;justify-content:space-between;gap:2px}
+.day .dn small{font-family:var(--f-body);font-weight:400;color:var(--muted);font-size:9.5px}
+.tag{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:3px;padding:0 3px;font-weight:700}
+.t-work{background:var(--steel-soft);color:var(--steel)}
+.t-plan{border:1px dashed var(--steel);color:var(--steel);font-weight:500}
+.t-stop{background:var(--bad-soft);color:var(--bad)}
+.t-ins{background:var(--warn-soft);color:var(--warn)}
+.t-ev{background:var(--ok-soft);color:var(--ok)}
+.t-rem{background:var(--accent);color:var(--on-accent)}
+.legend .tag{display:inline-block}
+.mini{display:flex;flex-wrap:wrap;gap:2px}
+.mini .tag{display:inline-block;padding:0 2px}
+[hidden]{display:none!important}
+.dp h3{margin:0;font-size:16px}
+.dsec{display:flex;flex-direction:column;gap:4px}
+.dline{display:flex;align-items:flex-start;gap:8px;font-size:14px;padding:4px 0;border-top:1px solid var(--line)}
+.dline:first-of-type{border-top:0}
+.dline .k{flex:none;min-width:58px;color:var(--muted);font-size:13px}
+.dline .v{flex:1;min-width:0;overflow-wrap:anywhere}
+.dline .x{flex:none;background:none;border:0;color:var(--muted);padding:0 4px;font-size:15px}
+.dline.done .v{text-decoration:line-through;color:var(--muted)}
+.ptab .day-row{cursor:pointer}
+.ptab td.items{text-align:left;white-space:normal;min-width:160px}
+.sug{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.sug:first-of-type{border-top:0}
+.sug .v{flex:1;min-width:0}
+.sug .v small{display:block;color:var(--muted);font-size:12.5px}
+/* 表格 */
+.ptab .tbl{overflow-x:auto;margin-top:8px}
+.ptab table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.ptab th,.ptab td{padding:6px 4px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+.ptab th{color:var(--muted);font-weight:500;font-size:12px}
+.ptab th:first-child,.ptab td:first-child{text-align:left}
+.ptab tr.cur td{font-weight:700;background:var(--sunk)}
+.ptab input{width:56px;text-align:right;background:var(--sunk);border:1px solid var(--line);border-radius:6px;padding:3px 6px;font-family:var(--f-data)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div class="demo"><b id="projName">未匯入</b><span id="projSub"></span><button id="reset" type="button">專案</button></div>
+    <div class="proj"><select id="areaSel" aria-label="切換工程"><option value="all">BC11 全部總覽</option><option value="pile">BC11基樁工程</option><option value="sub">BC11下構工程</option></select><span class="today">今天 <span class="num" id="todayTxt"></span></span></div>
+  </header>
+  <main id="view" class="wrap"></main>
+</div>
+<nav class="tabs" aria-label="主選單"><div class="in" id="tabs"></div></nav>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+let TODAY="", OVER=1.2; const VER=1; // OVER：混凝土超灌高度(m)，來自專案設定
+const ICONS={
+  home:'<path d="M3 11l9-7 9 7v9H3z"/><path d="M9 20v-6h6v6"/>',
+  pile:'<circle cx="12" cy="5" r="2.5"/><path d="M9.5 5v15M14.5 5v15M9.5 20h5"/><path d="M9.5 10h5M9.5 15h5"/>',
+  sub:'<rect x="3" y="14" width="18" height="6" rx="1"/><path d="M8 14V5h8v9"/>',
+  cal:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  log:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  report:'<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>',
+  material:'<path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/>'
+};
+const TABS=[["home","總覽"],["cal","月曆"],["log","每日紀錄"],["report","日報"],["material","材料"]];
+let INSP={"基樁":[],"下構":[]}; // 由專案設定決定
+let PAY_MANUAL=[]; // 手填計價項目，由專案設定決定
+const PAY_ITEMS=["圍籬施作","既有結構打除","樹木移植","地盤改良(JSG)"];
+const MACHINES=["搖管機","全套管機","吊車","挖土機","泵浦車","吊卡"];
+function crewFields(px,noMachine){
+  return `<div class="grid2">
+    <div class="field"><label for="${px}-vendor">廠商</label><input id="${px}-vendor" list="${px}-vendors" autocomplete="off" placeholder="選擇或輸入新廠商"><datalist id="${px}-vendors">${S.vendors.map(v=>`<option value="${esc(v)}">`).join("")}</datalist></div>
+    <div class="field"><label for="${px}-people">人數</label><input id="${px}-people" class="num" type="number" min="0" inputmode="numeric"></div>
+  </div>
+  ${noMachine?"":`<div class="field"><label>機具（填台數，沒用到留空）</label><div class="grid3">${MACHINES.map((m,i)=>`<div class="field"><label for="${px}-m${i}">${m}</label><input id="${px}-m${i}" class="num" type="number" min="0" inputmode="numeric"></div>`).join("")}</div></div>`}`;
+}
+function readCrew(px){
+  const v=document.getElementById(px+"-vendor").value.trim(), n=+document.getElementById(px+"-people").value||0;
+  const ms=MACHINES.map((m,i)=>{const el=document.getElementById(`${px}-m${i}`);return [m,el?(+el.value||0):0]}).filter(([,c])=>c>0);
+  if(v&&!S.vendors.includes(v)) S.vendors.push(v);
+  return {vendor:v,people:n,machines:Object.fromEntries(ms),crew:[v&&n?`${v}*${n}`:v,...ms.map(([m,c])=>`${m}*${c}`)].filter(Boolean).join(" ")};
+}
+let ITEMS=[], REASONS=[]; // 由專案設定決定
+const CAP_STEPS=["基礎開挖/擋土","PC打底","基礎鋼筋組立","基礎模板組立","基礎混凝土澆置","拆模","回填"];
+const STATUS={idle:{t:"未開始",c:"idle"},drill:{t:"鑽掘中",c:"steel"},pour:{t:"待澆置",c:"warn"},test:{t:"待完整性試驗",c:"warn"},done:{t:"完成",c:"ok"},bad:{t:"完整性異常",c:"bad"}};
+
+/* ---------- 日期 ---------- */
+const toDate=s=>{const [y,m,d]=s.split("/").map(Number);return new Date(y,m-1,d)};
+const fmt=dt=>`${dt.getFullYear()}/${String(dt.getMonth()+1).padStart(2,"0")}/${String(dt.getDate()).padStart(2,"0")}`;
+const addDays=(s,n)=>{const d=toDate(s);d.setDate(d.getDate()+n);return fmt(d)};
+const validDate=s=>/^\d{4}\/\d{2}\/\d{2}$/.test(s)&&!isNaN(toDate(s));
+TODAY=fmt(new Date());
+
+/* ---------- 計算 ---------- */
+const area=dia=>Math.PI*(dia/2)**2;
+const designVol=p=>area(p.dia)*p.L;            // 設計混凝土
+const overVol=p=>area(p.dia)*(p.L+OVER);       // 含超灌
+const ratio=p=>p.conc==null?null:p.conc/overVol(p);
+const ratioFlag=r=>r==null?null:r<1?"bad":r>1.25?"warn":"ok";
+function pileStatus(p){
+  if(p.conc!=null) return "done";
+  if(p.drilled) return "pour";
+  if(p.drilling) return "drill";
+  return "idle";
+}
+const isBad=p=>ratioFlag(ratio(p))==="bad";
+const canStart=pr=>["核定","已核定"].includes(pr.traffic)&&["不需","完成"].includes(pr.pipe)&&["不需","完成"].includes(pr.soil);
+
+/* ---------- 專案資料：由 Excel（或專案 .json）匯入，網頁本身不綁任何案子 ---------- */
+function emptyState(){
+  return {ver:VER,cfg:null,tab:"proj",area:"all",pileView:"map",openPier:null,openSub:null,pileFilter:"active",pileSeg:"all",pilePier:"",pileQuery:"",pileLimit:40,
+    logDate:TODAY,repDate:TODAY,piers:[],piles:[],logs:[],insps:[],weather:{},vendors:[],planOpen:{},planSel:{},calMonth:TODAY.slice(0,7),calSel:TODAY,calView:"grid",
+    events:[],plan:{pile:{},cap:{}},materials:[]};
+}
+// 把專案設定套到畫面用的全域清單
+let SHORT={}; // 要在 applyCfg 之前宣告，否則重新打開網頁時會出錯
+function applyCfg(){
+  const c=S.cfg, hide=["預壘樁","CCP"]; // 第一版只做基樁與下構
+  OVER=c.meta.overPour||1.2;
+  const its=c.lists.items.filter(x=>!hide.includes(x.name));
+  ITEMS=its.map(x=>x.name);
+  // 基樁施工版：每日紀錄只留這三個工項
+  const KEEP=["鑽掘","鋼筋籠加工","混凝土澆置"];
+  if(KEEP.every(k=>ITEMS.includes(k))) ITEMS=KEEP.slice();
+  SHORT=Object.fromEntries(its.map(x=>[x.name,x.short]));
+  REASONS=c.lists.reasons;
+  INSP={"基樁":c.lists.inspPile,"下構":c.lists.inspSub};
+  PAY_MANUAL=c.lists.manualPay.map(m=>{const it=(c.payItems||[]).find(x=>x.code===m.code);return {code:m.code,name:m.name,unit:it?it.unit:""}});
+}
+// 專案資料 → 網頁狀態；同編號的樁／墩保留原本的進度，其他紀錄原封不動
+function fromProject(proj,name){
+  const oPile=new Map(S.piles.map(p=>[p.no,p])), oPier=new Map(S.piers.map(p=>[p.id,p])), oMat=new Map(S.materials.map(m=>[m.name,m]));
+  S.cfg={meta:{name:name||proj.meta.name||"專案",overPour:proj.meta.overPour||1.2},lists:proj.lists,capSpecs:proj.capSpecs,payItems:proj.payItems,sections:proj.sections};
+  applyCfg();
+  const segOf=new Map(proj.piers.map(p=>[p.id,p.seg]));
+  S.piers=proj.piers.filter(x=>x.count>0).map(x=>{
+    const sp=proj.capSpecs[x.form]||{}, o=oPier.get(x.id)||{};
+    return {id:x.id,seg:x.seg||"",form:x.form||"",count:x.count,L:x.L,
+      capVol:sp.conc||0,capX:sp.x||0,capY:sp.y||0,capH:sp.h||0,capForm:sp.form||0,capRebar:sp.rebar||0,
+      cap:o.cap??-1,capDates:o.capDates||{},capConc:o.capConc??null,
+      ...((proj.pre&&proj.pre[x.id])||{traffic:o.traffic||"未確認",pipe:o.pipe||"未確認",soil:o.soil||"未確認"})};
+  });
+  S.piles=proj.piles.map(x=>{
+    const o=oPile.get(x.no)||{};
+    return {no:x.no,pier:x.pier,seg:segOf.get(x.pier)||"",dia:(x.dia||1500)/1000,L:x.L,payClass:x.payClass,
+      drilling:!!o.drilling,drilled:o.drilled||null,cageWip:!!o.cageWip,cage:o.cage||null,conc:o.conc??null,trucks:o.trucks??null,pour:o.pour||null,test:o.test||null,insp:o.insp||{}};
+  });
+  const mat=(name,unit,design,extra)=>({name,unit,design:Math.round(design),...extra});
+  const rb=oMat.get("樁帽鋼筋");
+  S.materials=[
+    mat("水中混凝土","m³",S.piles.reduce((a,p)=>a+overVol(p),0),{auto:"pile",area:"pile"}),
+    mat("樁帽混凝土","m³",S.piers.reduce((a,p)=>a+p.capVol,0),{auto:"cap",area:"sub"}),
+    mat("樁帽鋼筋","噸",S.piers.reduce((a,p)=>a+p.capRebar,0),{inn:rb?rb.inn:0,used:rb?rb.used:0,area:"sub"})
+  ];
+  if(!S.piers.some(p=>p.id===S.openPier)) S.openPier=null;
+  if(!S.piers.some(p=>p.id===S.openSub)) S.openSub=null;
+}
+
+let S=null;
+try{S=JSON.parse(localStorage.getItem("site-ctl-v1")||"null")}catch(e){S=null}
+if(!S||S.ver!==VER) S=emptyState();
+if(S.cfg) applyCfg();
+S.logDate=S.repDate=S.calSel=TODAY; S.calMonth=TODAY.slice(0,7); // 每次打開都從今天開始
+let saveWarned=false;
+const save=()=>{try{localStorage.setItem("site-ctl-v1",JSON.stringify(S))}catch(e){if(!saveWarned){saveWarned=true;alert("這支手機的瀏覽器空間不足，資料沒有存到。請先到「專案」頁匯出備份。")}}};
+
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const f1=n=>n.toLocaleString("zh-TW",{minimumFractionDigits:1,maximumFractionDigits:1});
+const f0=n=>Math.round(n).toLocaleString("zh-TW");
+const pierOf=id=>S.piers.find(x=>x.id===id);
+const pileOf=no=>S.piles.find(x=>x.no===no);
+const concUsed=()=>S.piles.reduce((a,p)=>a+(p.conc||0),0);
+const capUsed=()=>S.piers.reduce((a,p)=>a+(p.capConc||0),0);
+const cls=p=>{const s=pileStatus(p);return `s-${s}`};
+function toast(m){const t=document.getElementById("toast");t.textContent=m;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,1900)}
+
+/* ---------- 單月進度 ---------- */
+function monthActual(kind){
+  const m={}, add=d=>{if(d){const k=d.slice(0,7);m[k]=(m[k]||0)+1}};
+  if(kind==="pile") S.piles.forEach(p=>add(p.pour)); else S.piers.forEach(p=>add(p.capDates["基礎混凝土澆置"]));
+  return m;
+}
+function planRows(kind){
+  const plan=S.plan[kind], act=monthActual(kind), cur=TODAY.slice(0,7);
+  let cp=0,ca=0;
+  return Object.keys(plan).sort().map(m=>{cp+=plan[m];const past=m<=cur;if(past)ca+=act[m]||0;return {m,p:plan[m],a:past?(act[m]||0):null,cp,ca:past?ca:null}});
+}
+/* ---------- 每月進度目標：主任指定本月要做完哪些墩的基樁 ---------- */
+function parsePiers(str){
+  const ids=S.piers.map(p=>p.id), up=ids.map(x=>x.toUpperCase()), out=[], bad=[];
+  str.split(/[,，、;；\s]+/).filter(Boolean).forEach(t=>{
+    const r=t.split(/[~～]/);
+    if(r.length===2){const a=up.indexOf(r[0].toUpperCase()), b=up.indexOf(r[1].toUpperCase());
+      if(a<0||b<0||b<a){bad.push(t);return} for(let i=a;i<=b;i++) out.push(ids[i]);}
+    else{const i=up.indexOf(t.toUpperCase()); i<0?bad.push(t):out.push(ids[i]);}
+  });
+  return {ids:[...new Set(out)],bad};
+}
+function goalBlock(){
+  S.monthGoals=S.monthGoals||{};
+  const cur=TODAY.slice(0,7), m=S.goalSel||cur, g=S.monthGoals[m], ids=g?g.piers:[];
+  const ps=S.piles.filter(p=>ids.includes(p.pier)), done=ps.filter(p=>p.conc!=null).length, left=ps.length-done;
+  const chip=!ids.length?`<span class="chip idle">未設定</span>`:left===0?`<span class="chip ok">已完成</span>`:m<cur?`<span class="chip bad">未完成，差 <span class="num">${left}</span> 支</span>`:`<span class="chip steel">還差 <span class="num">${left}</span> 支</span>`;
+  const pierChip=id=>{const a=S.piles.filter(p=>p.pier===id), n=a.filter(p=>p.conc!=null).length;
+    return `<span class="chip ${n===a.length?"ok":n>0?"steel":"idle"}"><span class="num">${esc(id)}</span>&nbsp;<span class="num">${n}/${a.length}</span></span>`};
+  return `<section class="panel stack" aria-label="每月進度目標">
+    <div class="head-row"><span class="label">每月進度目標（基樁）</span>${chip}</div>
+    <div class="mrow"><button class="btn small" type="button" data-gm="-1" aria-label="上個月">‹</button>
+      <div class="mbig"><span class="num mm">${m.slice(0,4)}/${+m.slice(5)} 月</span><span class="num big">${done} / ${ps.length}</span><span class="note">支已澆置</span></div>
+      <button class="btn small" type="button" data-gm="1" aria-label="下個月">›</button></div>
+    ${ids.length?`<div class="pre">${ids.map(pierChip).join("")}</div>`:`<p class="hint">還沒設定這個月要做完哪些墩。</p>`}
+    <form class="stack" id="goalForm">
+      <div class="field"><label for="goal-in">這個月要做完的墩號（逗號分開，連續的用 ~，例如 P0201~P0205, P0301）</label><input id="goal-in" class="num" autocomplete="off" value="${esc(g?g.text:"")}"></div>
+      <div class="form-actions"><button class="btn primary" type="submit">儲存目標</button></div>
+    </form>
+  </section>`;
+}
+function monthBlock(kind){
+  const unit=kind==="pile"?"支":"座", cur=TODAY.slice(0,7), m=S.planSel[kind]||cur;
+  const plan=S.plan[kind][m]??0, act=monthActual(kind)[m]||0;
+  const chip=act>=plan&&plan>0?`<span class="chip ok">已達成</span>`:m<cur?`<span class="chip bad">未達成，差 <span class="num">${plan-act}</span> ${unit}</span>`:m===cur?`<span class="chip steel">進行中，還差 <span class="num">${Math.max(0,plan-act)}</span> ${unit}</span>`:`<span class="chip idle">尚未開始</span>`;
+  return `<section class="panel stack" aria-label="單月進度">
+    <div class="head-row"><span class="label">單月進度（${kind==="pile"?"基樁澆置":"樁帽澆置"}）</span>${chip}</div>
+    <div class="mrow"><button class="btn small" type="button" data-mm="${kind}|-1" aria-label="上個月">‹</button>
+      <div class="mbig"><span class="num mm">${m.slice(0,4)}/${+m.slice(5)} 月</span><span class="num big">${act} / ${plan}</span><span class="note">${unit}（實際／預定）</span></div>
+      <button class="btn small" type="button" data-mm="${kind}|1" aria-label="下個月">›</button></div>
+    <div class="mplan"><label for="plan-${kind}-${m.replace("/","-")}">這個月預定</label><input id="plan-${kind}-${m.replace("/","-")}" class="num" type="number" min="0" inputmode="numeric" value="${plan}"> ${unit}</div>
+  </section>`;
+}
+
+/* ---------- 全部總覽 ---------- */
+function vAll(){
+  const cur=TODAY.slice(0,7), mo=+cur.slice(5);
+  const bar=(a,b)=>`<div class="bar"><i style="width:${b?Math.min(a/b,1)*100:0}%"></i></div>`;
+  const pDone=S.piles.filter(p=>p.conc!=null).length, pM=monthActual("pile")[cur]||0, pPlan=S.plan.pile[cur]||0;
+  const pWip=S.piles.filter(p=>["drill","pour"].includes(pileStatus(p))).length, bad=S.piles.filter(isBad).length;
+  const cDone=S.piers.filter(p=>p.cap>=4).length, cM=monthActual("cap")[cur]||0, cPlan=S.plan.cap[cur]||0;
+  const cWip=S.piers.filter(p=>capState(p)==="wip").length, cReady=S.piers.filter(p=>capState(p)==="ready").length;
+  const T=dayInfo(TODAY);
+  const up=[];
+  for(let i=0;i<=7;i++){const d=addDays(TODAY,i);
+    S.events.filter(e=>e.date===d&&!e.done).forEach(e=>up.push({d,k:e.type==="重要行程"?"★行程":"!提醒",c:e.type==="重要行程"?"ok":"warn",t:e.title}));
+    if(i===0) autoReminders(d).forEach(r=>up.push({d,k:"!自動",c:"warn",t:r}));
+  }
+  const work=(name,area,rows,note)=>`<article class="card"><div class="head-row"><h3>${name}</h3><button class="btn small" type="button" data-goarea="${area}">進入 ›</button></div>${rows}<div class="note">${note}</div></article>`;
+  return `<div><h2>BC11 全部總覽</h2><p class="sub">截至 ${TODAY}</p></div>
+  ${goalBlock()}
+  ${work("BC11基樁工程","pile",
+    `<div class="prog-row"><span>累計</span>${bar(pDone,S.piles.length)}<span class="num">${pDone} / ${S.piles.length} 支</span></div>
+     <div class="prog-row"><span>${mo} 月</span>${bar(pM,pPlan)}<span class="num">${pM} / ${pPlan} 支</span></div>`,
+    `施工中 <b class="num">${pWip}</b> 支・可開工墩 <b class="num">${S.piers.filter(canStart).length}</b> / ${S.piers.length}${bad?`・<b style="color:var(--bad)">充盈係數異常 ${bad} 支</b>`:""}`)}
+  ${work("BC11下構工程","sub",
+    `<div class="prog-row"><span>累計</span>${bar(cDone,S.piers.length)}<span class="num">${cDone} / ${S.piers.length} 座</span></div>
+     <div class="prog-row"><span>${mo} 月</span>${bar(cM,cPlan)}<span class="num">${cM} / ${cPlan} 座</span></div>`,
+    `施工中 <b class="num">${cWip}</b> 座・可開始 <b class="num">${cReady}</b> 座`)}
+  <section class="panel stack"><div class="head-row"><span class="label">今日施作（${TODAY}）</span><button class="btn small" type="button" data-tab="report">看日報 ›</button></div>
+    <div class="dsec">${grouped(T.work).map(([it,ps])=>`<div class="dline"><span class="k">${esc(SHORT[it]||it)}</span><span class="v num">${ps.map(esc).join("、")}</span></div>`).join("")||`<p class="hint">今天還沒有施作紀錄</p>`}
+    ${T.ins.map(x=>`<div class="dline"><span class="k"><span class="chip warn">▲查驗</span></span><span class="v"><span class="num">${esc(x.part)}</span> ${esc(x.item)}</span></div>`).join("")}</div>
+  </section>
+  <section class="panel stack"><div class="head-row"><span class="label">近 7 天行程與提醒</span><button class="btn small" type="button" data-gocal="${TODAY}">看月曆 ›</button></div>
+    <div class="dsec">${up.map(x=>`<div class="dline"><span class="k num">${x.d.slice(5)}</span><span class="v"><span class="chip ${x.c}">${x.k}</span> ${esc(x.t)}</span></div>`).join("")||`<p class="hint">近 7 天沒有行程或提醒</p>`}</div>
+  </section>`;
+}
+
+/* ---------- 基樁：配置圖 ---------- */
+function pileViewSeg(){return `<div class="seg" role="group" aria-label="檢視方式"><button type="button" data-pview="map" aria-pressed="${S.pileView!=="list"}">配置圖</button><button type="button" data-pview="list" aria-pressed="${S.pileView==="list"}">清單</button></div>`}
+function vHome(){
+  const piles=S.piles, total=piles.length;
+  const poured=piles.filter(p=>p.conc!=null).length, tested=piles.filter(p=>p.test==="合格").length;
+  const capsDone=S.piers.filter(p=>p.cap>=4).length, ready=S.piers.filter(canStart).length;
+  const month=TODAY.slice(0,7);
+  const mConc=piles.filter(p=>p.pour&&p.pour.startsWith(month)).reduce((a,p)=>a+p.conc,0);
+  const todayRows=S.logs.filter(l=>l.date===TODAY&&l.status==="施工").length;
+  const segs=[...new Set(S.piers.map(p=>p.seg))];
+  const flags=piles.filter(p=>isBad(p)||ratioFlag(ratio(p))==="warn");
+  return `${pileViewSeg()}<section class="panel stack" aria-label="施工進度">
+    <span class="label">施工進度（截至 ${TODAY}）</span>
+    <div class="prog-row"><span>基樁澆置</span><div class="bar"><i style="width:${poured/total*100}%"></i></div><span class="num">${poured} / ${total} 支</span></div>
+  </section>
+  <div class="stats">
+    <div class="stat"><span class="label">今日施作</span><span class="v">${todayRows}<small>項</small></span></div>
+    <div class="stat"><span class="label">本月澆置</span><span class="v">${f0(mConc)}<small>m³</small></span></div>
+    <div class="stat"><span class="label">可開工墩</span><span class="v">${ready}<small>/ ${S.piers.length}</small></span></div>
+  </div>
+  ${goalBlock()}
+  ${monthBlock("pile")}
+  <section class="panel stack"><div class="head-row"><span class="label">樁位總覽（點墩號展開）</span><span class="sub">淡色＝前置條件未完成，還不能開工</span></div>
+    ${segs.map(sg=>`<div class="seg-title">${esc(sg)}</div><div class="tiles">${S.piers.filter(p=>p.seg===sg).map(tile).join("")}</div>`).join("")}
+    ${pierDetail()}
+    <div class="legend"><span><i></i>未開始</span><span><i class="s-drill"></i>鑽掘中</span><span><i class="s-pour"></i>待澆置</span><span><i class="s-done"></i>完成</span><span><i class="s-bad"></i>異常</span></div>
+  </section>
+  ${flags.length?`<section class="list"><span class="label">需要注意</span>${flags.map(pileCard).join("")}</section>`:""}`;
+}
+function tile(pr){
+  const ps=S.piles.filter(p=>p.pier===pr.id);
+  return `<button type="button" class="tile ${S.openPier===pr.id?"on":""} ${canStart(pr)?"":"blocked"} ${ps.some(isBad)?"has-bad":""}" data-pier="${esc(pr.id)}" aria-expanded="${S.openPier===pr.id}" aria-label="${esc(pr.id)}">
+    <span class="dots" aria-hidden="true">${ps.map(p=>`<i class="${cls(p)}"></i>`).join("")}</span><span class="tl">${esc(pr.id.replace(/^P0?/,"P"))}</span></button>`;
+}
+function preChip(name,v,okVals){return `<span class="chip ${okVals.includes(v)?"ok":"warn"}">${name}：${esc(v)}</span>`}
+/* ---------- 鑽掘前置作業（只做鑽掘，不提醒、不擋） ---------- */
+const DRILL_PRE=["樁位放樣完成","機具進場（搖管機、吊車）","套管準備","地下管線確認"];
+const preDone=p=>DRILL_PRE.filter((_,i)=>p.pre&&p.pre[i]).length;
+function preList(p){
+  const n=preDone(p);
+  if(p.drilled||p.conc!=null) return `<div class="note">鑽掘前置作業 <span class="num">${n}/${DRILL_PRE.length}</span></div>`;
+  return `<div class="prelist"><span class="label">鑽掘前置作業 <span class="num" id="prec-${esc(p.no)}">${n}/${DRILL_PRE.length}</span></span>
+    ${DRILL_PRE.map((t,i)=>`<label><input type="checkbox" data-pre="${esc(p.no)}|${i}" ${p.pre&&p.pre[i]?"checked":""}> ${t}</label>`).join("")}</div>`;
+}
+function pierDetail(){
+  const pr=pierOf(S.openPier); if(!pr) return `<p class="hint">點任一個墩號，展開看每支樁和開工條件</p>`;
+  const ps=S.piles.filter(p=>p.pier===pr.id);
+  const capTxt=pr.cap<0?"未開始":pr.cap>=CAP_STEPS.length-1?"完成":CAP_STEPS[pr.cap];
+  return `<div class="gd">
+    <div class="head-row"><h3 class="num" style="margin:0">${esc(pr.id)}</h3><span class="chip ${canStart(pr)?"ok":"warn"}">${canStart(pr)?"可開工":"還不能開工"}</span></div>
+    <div class="note">${esc(pr.seg)}　·　基礎型式 ${esc(pr.form)}　·　${pr.count} 支　·　樁長 <span class="num">${pr.L}</span> m</div>
+    <div class="pre">${preChip("交維",pr.traffic,["核定","已核定"])}${preChip("管線",pr.pipe,["不需","完成"])}${preChip("地改",pr.soil,["不需","完成"])}</div>
+    <div class="note">鑽掘前置作業完成：<span class="num">${S.piles.filter(p=>p.pier===pr.id&&preDone(p)===DRILL_PRE.length).length} / ${pr.count}</span> 支（點下面的樁可以勾選）</div>
+    <div class="cells">${ps.map(p=>`<button type="button" class="cell ${cls(p)}" data-pile="${esc(p.no)}" aria-label="${esc(p.no)} ${STATUS[pileStatus(p)].t}">${p.no.split("-").pop()}</button>`).join("")}</div>
+    <button type="button" class="btn small" style="align-self:flex-start" data-gosub="${esc(pr.id)}">看 ${esc(pr.id)} 樁帽（下構）›</button>
+  </div>`;
+}
+
+/* ---------- 基樁 ---------- */
+function pileCard(p){
+  const s=pileStatus(p), r=ratio(p), rf=ratioFlag(r);
+  const c=(s==="bad"||rf==="bad")?"flag-bad":rf==="warn"?"flag":"";
+  const st=(on,now,bad,label,d)=>`<div class="step ${bad?"bad":on?"on":now?"now":""}"><b>${label}</b><span class="num">${d||"—"}</span></div>`;
+  const ins=["(一)鑽掘","(二)鋼筋籠","(三)混凝土澆置"].map(k=>`${k.slice(0,3)}${p.insp[k]?esc(p.insp[k]):"未查驗"}`).join("　");
+  return `<article class="card ${c}" id="pile-${esc(p.no)}">
+    <div class="head-row"><h3 class="num">${esc(p.no)}</h3><span class="chip ${STATUS[s].c}">${STATUS[s].t}</span></div>
+    <div class="note">${esc(p.seg)}　·　Φ${p.dia*1000} mm　·　樁長 <span class="num">${p.L}</span> m</div>
+    <div class="steps">
+      ${st(!!p.drilled,p.drilling&&!p.drilled,false,"鑽掘",p.drilled?p.drilled.slice(5):(p.drilling?"進行中":""))}
+      ${st(!!p.cage,p.cageWip&&!p.cage,false,"鋼筋籠加工",p.cage?p.cage.slice(5):(p.cageWip?"進行中":""))}
+      ${st(p.conc!=null,!!p.drilled&&p.conc==null,false,"澆置",p.pour?p.pour.slice(5):"")}
+    </div>
+    ${p.conc!=null?`<div class="conc">
+      <div><span class="label">含超灌設計</span><span class="num">${f1(overVol(p))} m³</span></div>
+      <div><span class="label">實際</span><span class="num">${f1(p.conc)} m³</span></div>
+      <div><span class="label">充盈係數</span><span class="num" style="color:var(--${rf})">${r.toFixed(2)}</span></div>
+    </div>`:`<div class="note">設計混凝土 <span class="num">${f1(designVol(p))}</span> m³，含超灌 <span class="num">${f1(overVol(p))}</span> m³</div>`}
+    ${preList(p)}
+    <div class="note">查驗：${ins}</div>
+  </article>`;
+}
+function vPile(){
+  const q=S.pileQuery.trim().toUpperCase();
+  const F={active:["施工中",p=>["drill","pour","test","bad"].includes(pileStatus(p))],idle:["未開始",p=>pileStatus(p)==="idle"],done:["完成",p=>pileStatus(p)==="done"],all:["全部",()=>true]};
+  let shown=S.piles.filter(F[S.pileFilter][1]);
+  if(S.pilePier) shown=shown.filter(p=>p.pier===S.pilePier);
+  else if(S.pileSeg!=="all") shown=shown.filter(p=>p.seg===S.pileSeg);
+  if(q) shown=shown.filter(p=>p.no.toUpperCase().includes(q));
+  const segs=[...new Set(S.piers.map(p=>p.seg))];
+  return `${pileViewSeg()}<div><h2>基樁清單</h2><p class="sub">共 <span class="num">${S.piles.length}</span> 支　·　完成 <span class="num">${S.piles.filter(p=>pileStatus(p)==="done").length}</span> 支</p></div>
+  ${S.pilePier?`<button type="button" class="filter-chip" id="clearPier">只看 ${esc(S.pilePier)}　✕</button>`:`<div class="grid2">
+    <div class="field"><label for="pf-q">搜尋樁號</label><input id="pf-q" class="num" type="search" autocomplete="off" placeholder="例：P0205-2" value="${esc(S.pileQuery)}"></div>
+    <div class="field"><label for="pf-s">區段</label><select id="pf-s"><option value="all">全部區段</option>${segs.map(s=>`<option ${S.pileSeg===s?"selected":""}>${esc(s)}</option>`).join("")}</select></div>
+  </div>`}
+  <div class="seg" role="group" aria-label="篩選">${Object.entries(F).map(([k,[n]])=>`<button type="button" data-filter="${k}" aria-pressed="${S.pileFilter===k}">${n}</button>`).join("")}</div>
+  <p class="sub">符合 <span class="num">${shown.length}</span> 支${shown.length>S.pileLimit?`，先顯示前 <span class="num">${S.pileLimit}</span> 支`:""}</p>
+  <section class="list">${shown.slice(0,S.pileLimit).map(pileCard).join("")||`<div class="panel empty">沒有符合的基樁</div>`}</section>
+  ${shown.length>S.pileLimit?`<button class="btn" type="button" id="morePiles">再顯示 40 支</button>`:""}`;
+}
+
+/* ---------- 下構（樁帽） ---------- */
+const CAPST={wait:["基樁未完成","idle"],ready:["可開始","steel"],wip:["施工中","warn"],done:["完成","ok"]};
+function capState(pr){
+  if(pr.cap>=CAP_STEPS.length-1) return "done";
+  if(pr.cap>=0) return "wip";
+  return S.piles.some(p=>p.pier===pr.id&&p.conc==null)?"wait":"ready";
+}
+function ctile(pr){
+  const s=capState(pr);
+  return `<button type="button" class="ctile c-${s} ${S.openSub===pr.id?"on":""}" data-sub="${esc(pr.id)}" aria-expanded="${S.openSub===pr.id}" aria-label="${esc(pr.id)} ${CAPST[s][0]}">
+    <span class="segs" aria-hidden="true">${CAP_STEPS.map((_,k)=>`<i class="${k<=pr.cap?"f":""}"></i>`).join("")}</span><span class="tl">${esc(pr.id.replace(/^P0?/,"P"))}</span></button>`;
+}
+function capCard(pr){
+  const s=capState(pr), r=pr.capConc!=null?pr.capConc/pr.capVol:null;
+  const poured=S.piles.filter(p=>p.pier===pr.id&&p.conc!=null).length;
+  return `<article class="card" id="cap-${esc(pr.id)}">
+    <div class="head-row"><h3 class="num">${esc(pr.id)} 樁帽</h3><span class="chip ${CAPST[s][1]}">${CAPST[s][0]}</span></div>
+    <div class="note">${esc(pr.seg)}　·　${esc(pr.form)}　·　<span class="num">${pr.capX}×${pr.capY}×${pr.capH}</span> m　·　基樁已澆置 <span class="num">${poured}/${pr.count}</span> 支</div>
+    <ol class="vsteps">${CAP_STEPS.map((n,k)=>`<li class="${k<=pr.cap?"on":(k===pr.cap+1&&s!=="wait"?"next":"")}"><span>${n}</span><span class="num">${pr.capDates[n]?pr.capDates[n].slice(5):"—"}</span></li>`).join("")}</ol>
+    <div class="conc">
+      <div><span class="label">設計混凝土</span><span class="num">${f1(pr.capVol)} m³</span></div>
+      <div><span class="label">實際</span><span class="num">${pr.capConc!=null?f1(pr.capConc)+" m³":"—"}</span></div>
+      <div><span class="label">鋼筋（估）</span><span class="num">${pr.capRebar} t</span></div>
+    </div>
+    <div class="note">側模 <span class="num">${pr.capForm}</span> m²${r?`　·　實際／設計 <span class="num">${r.toFixed(2)}</span>`:""}</div>
+  </article>`;
+}
+function vSub(){
+  const total=S.piers.length;
+  const poured=S.piers.filter(p=>p.cap>=4).length, backfill=S.piers.filter(p=>p.cap>=6).length;
+  const wip=S.piers.filter(p=>capState(p)==="wip"), ready=S.piers.filter(p=>capState(p)==="ready");
+  const month=TODAY.slice(0,7);
+  const mConc=S.piers.filter(p=>(p.capDates["基礎混凝土澆置"]||"").startsWith(month)).reduce((a,p)=>a+(p.capConc||0),0);
+  const segs=[...new Set(S.piers.map(p=>p.seg))];
+  const pr=pierOf(S.openSub);
+  return `<div><h2>下構（樁帽）</h2><p class="sub">開挖 → PC 打底 → 鋼筋 → 模板 → 澆置 → 拆模 → 回填</p></div>
+  <section class="panel stack" aria-label="下構進度">
+    <span class="label">施工進度（截至 ${TODAY}）</span>
+    <div class="prog-row"><span>樁帽澆置</span><div class="bar"><i style="width:${poured/total*100}%"></i></div><span class="num">${poured} / ${total} 座</span></div>
+    <div class="prog-row"><span>回填完成</span><div class="bar"><i style="width:${backfill/total*100}%"></i></div><span class="num">${backfill} / ${total} 座</span></div>
+  </section>
+  <div class="stats">
+    <div class="stat"><span class="label">施工中</span><span class="v">${wip.length}<small>座</small></span></div>
+    <div class="stat"><span class="label">可開始</span><span class="v">${ready.length}<small>座</small></span></div>
+    <div class="stat"><span class="label">本月澆置</span><span class="v">${f0(mConc)}<small>m³</small></span></div>
+  </div>
+  ${monthBlock("cap")}
+  <section class="panel stack"><div class="head-row"><span class="label">樁帽總覽（點墩號展開）</span><span class="sub">每格 7 條＝7 個工序</span></div>
+    ${segs.map(sg=>`<div class="seg-title">${esc(sg)}</div><div class="tiles">${S.piers.filter(p=>p.seg===sg).map(ctile).join("")}</div>`).join("")}
+    <div class="legend"><span><i class="c-wait"></i>基樁未完成</span><span><i class="c-ready"></i>可開始</span><span><i class="c-wip"></i>施工中</span><span><i class="c-done"></i>完成</span></div>
+  </section>
+  ${pr?capCard(pr):`<p class="hint">點任一個墩號，看那座樁帽的工序和數量</p>`}
+  ${wip.filter(p=>p!==pr).length?`<section class="list"><span class="label">其他施工中的樁帽</span>${wip.filter(p=>p!==pr).map(capCard).join("")}</section>`:""}`;
+}
+
+/* ---------- 月曆 ---------- */
+
+const WD="日一二三四五六";
+const shiftMonth=(ym,n)=>{const [y,m]=ym.split("/").map(Number);const d=new Date(y,m-1+n,1);return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}`};
+const grouped=rows=>{const g={};rows.forEach(l=>(g[l.item]||(g[l.item]=[])).push(l.part));return Object.entries(g)};
+function concCall(l){
+  const p=pileOf(l.part), pr=/-樁帽$/.test(l.part)?pierOf(l.part.replace(/-樁帽$/,"")):null;
+  const v=p?overVol(p)*1.06:pr?pr.capVol*1.02:null;   // 依過去充盈係數多抓一點
+  return v?{v,trucks:Math.ceil(v/7.5)}:null;
+}
+function autoReminders(d){
+  const out=[];
+  if(d===TODAY) S.materials.filter(m=>m.reorder&&m.inn-m.used<m.reorder).forEach(m=>out.push(`${m.name} 庫存剩 ${f1(m.inn-m.used)} ${m.unit}，低於 ${m.reorder} ${m.unit}，該叫料了`));
+  return out;
+}
+function dayInfo(d){
+  const rows=S.logs.filter(l=>l.date===d);
+  return {work:rows.filter(l=>l.status==="施工"),stop:rows.filter(l=>l.status==="未施工"),plan:rows.filter(l=>l.status==="預定"),
+    ins:S.insps.filter(x=>x.date===d),ev:S.events.filter(x=>x.date===d),rem:autoReminders(d)};
+}
+function dayCell(ds){
+  const I=dayInfo(ds), dt=toDate(ds), w=S.weather[ds];
+  const remN=I.rem.length+I.ev.filter(e=>e.type!=="重要行程"&&!e.done).length, evN=I.ev.filter(e=>e.type==="重要行程").length;
+  const tags=[
+    I.work.length?`<span class="tag t-work">施作${I.work.length}</span>`:"",
+    I.stop.length?`<span class="tag t-stop">停工${I.stop.length}</span>`:"",
+    (I.ins.length||evN||remN)?`<span class="mini">${I.ins.length?`<span class="tag t-ins">▲${I.ins.length}</span>`:""}${evN?`<span class="tag t-ev">★${evN}</span>`:""}${remN?`<span class="tag t-rem">!${remN}</span>`:""}</span>`:""
+  ].join("");
+  return `<button type="button" class="day ${dt.getDay()===0?"sun":""} ${ds===TODAY?"today":""} ${ds===S.calSel?"sel":""}" data-cd="${ds}" aria-label="${ds}">
+    <span class="dn">${dt.getDate()}${w&&w[0]?`<small>${esc(w[0])}</small>`:""}</span>${tags}</button>`;
+}
+function dayPanel(ds){
+  const I=dayInfo(ds), w=S.weather[ds];
+  const line=(k,v,extra="",cls="")=>`<div class="dline ${cls}"><span class="k">${k}</span><span class="v">${v}</span>${extra}</div>`;
+  const parts=[];
+  grouped(I.work).forEach(([it,ps])=>parts.push(line(esc(SHORT[it]||it),`<span class="num">${ps.map(esc).join("、")}</span>`)));
+  I.stop.forEach(l=>parts.push(line(`<span class="chip bad">停工</span>`,`<span class="num">${esc(l.part)}</span> ${esc(l.item)}（${esc(l.reason||"—")}）`)));
+  I.ins.forEach(x=>parts.push(line(`<span class="chip warn">▲查驗</span>`,`<span class="num">${esc(x.part)}</span> ${esc(x.item)}${x.witness?"（監造會同）":""}`)));
+  I.ev.forEach(e=>parts.push(line(`<span class="chip ${e.type==="重要行程"?"ok":"warn"}">${e.type==="重要行程"?"★行程":"!提醒"}</span>`,esc(e.title),
+    `<label class="note" style="flex:none"><input type="checkbox" data-evdone="${e.id}" ${e.done?"checked":""}> 完成</label><button class="x" type="button" data-delev="${e.id}" aria-label="刪除">✕</button>`,e.done?"done":"")));
+  I.rem.forEach(r=>parts.push(line(`<span class="chip warn">!自動</span>`,esc(r))));
+  const pileOpts=S.piles.filter(p=>p.conc==null&&canStart(pierOf(p.pier))).slice(0,60).map(p=>`<option value="${p.no}">`).join("")+S.piers.map(p=>`<option value="${p.id}-樁帽">`).join("");
+  return `<section class="panel stack dp" id="dayPanel">
+    <div class="head-row"><h3 class="num">${ds}（${WD[toDate(ds).getDay()]}）</h3><span class="sub">${w&&(w[0]||w[1])?`上午 ${esc(w[0]||"—")}・下午 ${esc(w[1]||"—")}`:""}</span></div>
+    <div class="dsec">${parts.join("")||`<p class="hint">這天還沒有任何紀錄</p>`}</div>
+    <div class="row-actions" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn small primary" type="button" id="addPlan">＋ 預定施作</button><button class="btn small" type="button" id="addEv">＋ 行程／提醒</button></div>
+    <form class="stack" id="planForm" hidden>
+      <div class="grid2">
+        <div class="field"><label for="pl-part">部位（連續排程時填第一支）</label><input id="pl-part" class="num" list="plparts" autocomplete="off" placeholder="例：P0209-2"><datalist id="plparts">${pileOpts}</datalist></div>
+        <div class="field"><label for="pl-item">工項</label><select id="pl-item">${ITEMS.map(x=>`<option>${x}</option>`).join("")}</select></div>
+      </div>
+      ${crewFields("pl",true)}
+      <div class="grid3">
+        <div class="field"><label for="pl-count">共幾支</label><input id="pl-count" class="num" type="number" min="1" value="1" inputmode="numeric"></div>
+        <div class="field"><label for="pl-per">每天幾支</label><input id="pl-per" class="num" type="number" min="1" value="1" inputmode="numeric"></div>
+        <div class="field"><label for="pl-sun" style="visibility:hidden">週日</label><label><input id="pl-sun" type="checkbox" checked> 跳過週日</label></div>
+      </div>
+      <p class="hint">共幾支大於 1 時，會從這一天起依樁號順序自動往後排，例如 P0209-2、P0209-3…</p>
+      <div class="form-actions"><button class="btn ghost" type="button" id="cancelPlan">取消</button><button class="btn primary" type="submit">加入預定</button></div>
+    </form>
+    <form class="stack" id="evForm" hidden>
+      <div class="grid2">
+        <div class="field"><label for="ev-type">類型</label><select id="ev-type"><option>重要行程</option><option>進料提醒</option><option>其他提醒</option></select></div>
+        <div class="field"><label for="ev-title">內容</label><input id="ev-title" placeholder="例：鋼筋進料 30 噸／週會 14:00"></div>
+      </div>
+      <div class="form-actions"><button class="btn ghost" type="button" id="cancelEv">取消</button><button class="btn primary" type="submit">加入</button></div>
+    </form>
+  </section>`;
+}
+function vCal(){
+  const [y,m]=S.calMonth.split("/").map(Number);
+  const days=new Date(y,m,0).getDate(), pad=new Date(y,m-1,1).getDay();
+  const dsOf=d=>`${S.calMonth}/${String(d).padStart(2,"0")}`;
+  const head=`<div><h2>月曆</h2><p class="sub">每天的施作、查驗、行程和提醒；點日期看詳細</p></div>
+  <div class="datebar"><button class="btn small" type="button" data-cm="-1" aria-label="上個月">‹</button><b class="num" style="flex:1;text-align:center">${y} 年 ${m} 月</b><button class="btn small" type="button" data-cm="1" aria-label="下個月">›</button></div>
+  <div class="seg" role="group" aria-label="檢視方式"><button type="button" data-cv="grid" aria-pressed="${S.calView!=="table"}">月曆</button><button type="button" data-cv="table" aria-pressed="${S.calView==="table"}">本月預定表</button></div>`;
+  let body;
+  if(S.calView==="table"){
+    const target=S.plan.pile[S.calMonth];
+    const pours=S.logs.filter(l=>l.date.startsWith(S.calMonth)&&l.item==="混凝土澆置"&&l.status!=="未施工");
+    const doneN=pours.filter(l=>l.status==="施工").length, planN=pours.filter(l=>l.status==="預定").length;
+    body=`<section class="panel stack">
+      <div class="head-row"><span class="label">本月基樁澆置</span><span class="sub">目標 <b class="num">${target??"—"}</b> 支・已完成 <b class="num">${doneN}</b>・已排定 <b class="num">${planN}</b>${target!=null?`・還差 <b class="num">${Math.max(0,target-doneN-planN)}</b>`:""}</span></div>
+      <div class="ptab"><div class="tbl"><table><thead><tr><th>日期</th><th class="items">預定／實際施作</th><th>＋</th></tr></thead><tbody>
+      ${Array.from({length:days},(_,i)=>{const ds=dsOf(i+1),I=dayInfo(ds),dt=toDate(ds);
+        const txt=I.work.length?grouped(I.work).map(([it,ps])=>`${SHORT[it]}：${ps.join("、")}`).join("；"):grouped(I.plan).map(([it,ps])=>`<span style="color:var(--steel)">${SHORT[it]}：${ps.join("、")}</span>`).join("；");
+        return `<tr class="day-row ${ds===TODAY?"cur":""}" data-cd="${ds}"><td class="num" style="${dt.getDay()===0?"color:var(--bad)":""}">${+ds.slice(8)}（${WD[dt.getDay()]}）</td><td class="items">${txt||`<span class="note">—</span>`}</td><td><button class="btn small" type="button" data-cplan="${ds}" aria-label="${ds} 新增預定">＋</button></td></tr>`}).join("")}
+      </tbody></table></div></div>
+      <p class="hint">黑字＝已施作，藍字＝預定。按 ＋ 幫那天排預定；排好的預定會自動變成日報的「明日施作」。</p>
+    </section>`;
+  }else{
+    body=`<section class="panel stack"><div class="cal">${[...WD].map((w,i)=>`<span class="dow ${i===0?"sun":""}">${w}</span>`).join("")}
+      ${Array.from({length:pad},()=>`<span class="day pad" aria-hidden="true"></span>`).join("")}${Array.from({length:days},(_,i)=>dayCell(dsOf(i+1))).join("")}</div>
+      <div class="legend"><span class="tag t-work">施作</span><span class="tag t-stop">停工</span><span class="tag t-ins">▲查驗</span><span class="tag t-ev">★行程</span><span class="tag t-rem">!提醒</span></div></section>`;
+  }
+  return head+body+dayPanel(S.calSel);
+}
+function addPlans(start,item,crew,count,per,skipSun,from){
+  const pile=pileOf(start);
+  if(!pile||count<=1){ S.logs.push({id:Date.now().toString(36),date:from,part:start,item,status:"預定",crew,note:"",reason:""}); return 1 }
+  let i=S.piles.indexOf(pile), d=from, made=0;
+  while(made<count&&i<S.piles.length){
+    if(skipSun&&toDate(d).getDay()===0){d=addDays(d,1);continue}
+    for(let k=0;k<per&&made<count&&i<S.piles.length;k++,i++,made++) S.logs.push({id:Date.now().toString(36)+made,date:d,part:S.piles[i].no,item,status:"預定",crew,note:"",reason:""});
+    d=addDays(d,1);
+  }
+  return made;
+}
+
+/* ---------- 明日預計：依目前進度自動建議 ---------- */
+function suggestTomorrow(d){
+  const next=addDays(d,1), have=new Set(S.logs.filter(l=>l.date===next&&l.status==="預定").map(l=>l.part+"|"+l.item));
+  const lastCrew=(part,item)=>{const r=S.logs.filter(l=>l.part===part&&l.item===item&&l.crew).pop();return r?r.crew:""};
+  const out=[];
+  S.piles.forEach(p=>{
+    if(p.drilled&&p.conc==null) out.push({part:p.no,item:"混凝土澆置",why:"已鑽至設計樁底，等待澆置",crew:lastCrew(p.no,"鑽掘").replace(/\s*搖管機\*\d+/,"")});
+    else if(p.drilling&&!p.drilled) out.push({part:p.no,item:"鑽掘",why:"鑽掘進行中，繼續鑽",crew:lastCrew(p.no,"鑽掘")});
+    if(p.cageWip&&!p.cage) out.push({part:p.no,item:"鋼筋籠加工",why:"鋼筋籠還在加工",crew:lastCrew(p.no,"鋼筋籠加工")});
+  });
+  S.piers.filter(pr=>pr.cap>=0&&pr.cap<CAP_STEPS.length-1).forEach(pr=>out.push({part:pr.id+"-樁帽",item:CAP_STEPS[pr.cap+1],why:`上一步「${CAP_STEPS[pr.cap]}」已完成`,crew:""}));
+  return out.filter(x=>!have.has(x.part+"|"+x.item));
+}
+
+/* ---------- 每日紀錄 ---------- */
+function logLine(l){
+  const pile=pileOf(l.part);
+  let extra="";
+  if((l.item==="混凝土澆置"||l.item==="基礎混凝土澆置")&&l.conc!=null){const pr=pierOf(l.part.replace(/-樁帽$/,""));const dv=pile?overVol(pile):(pr?pr.capVol:null);extra=`實際 ${f1(l.conc)} m³・${l.trucks||"—"} 車・取樣 ${l.samples||0} 組${dv?`（設計 ${f1(dv)} m³）`:""}`}
+  if(l.status==="未施工") extra=`原因：${l.reason||"—"}`;
+  payLines(l).forEach(x=>{extra+=(extra?"　":"")+`計價 ${fq(x.qty)} ${x.unit}`});
+  if(l.note) extra+=(extra?"　":"")+l.note;
+  const chip=l.status==="施工"?"ok":l.status==="預定"?"steel":"bad";
+  return `<div class="logrow"><span class="what"><span class="num">${esc(l.part)}</span>　${esc(l.item)}</span><span class="chip ${chip}">${esc(l.status)}</span>
+    ${l.crew?`<span class="crew">${esc(l.crew)}</span>`:""}${extra?`<span class="extra">${esc(extra)}</span>`:""}</div>`;
+}
+function insLine(x){
+  return `<div class="logrow"><span class="what"><span class="num">${esc(x.part)}</span>　${esc(x.item)}</span><span class="chip ${x.result==="合格"?"ok":"bad"}">${esc(x.result)}</span>
+    <span class="crew">${x.witness?"監造會同":"自主檢查"}${x.sheet?`・表號 <span class="num">${esc(x.sheet)}</span>`:""}</span></div>`;
+}
+function vLog(){
+  const ins=S.insps.filter(x=>x.date===S.logDate);
+  const d=S.logDate, rows=S.logs.filter(l=>l.date===d);
+  const w=S.weather[d]||["",""];
+  const wOpt=v=>["","晴","多雲","陰","雨","陣雨","晴時多雲"].map(x=>`<option ${x===v?"selected":""} value="${x}">${x||"—"}</option>`).join("");
+  return `<div class="head-row"><div><h2>每日紀錄</h2><p class="sub">一個部位、一個工項一列；澆置時填實際方數</p></div></div>
+  <div class="datebar"><button class="btn small" type="button" data-day="-1" aria-label="前一天">‹</button><input id="logDate" class="num" value="${d}" aria-label="日期"><button class="btn small" type="button" data-day="1" aria-label="後一天">›</button></div>
+  <section class="panel stack">
+    <div class="grid2"><div class="field"><label for="w-am">上午天氣</label><select id="w-am">${wOpt(w[0])}</select></div><div class="field"><label for="w-pm">下午天氣</label><select id="w-pm">${wOpt(w[1])}</select></div></div>
+    <div>${rows.map(logLine).join("")||`<p class="empty" style="padding:8px">這天還沒有紀錄</p>`}</div>
+  </section>
+  <button class="btn primary" type="button" id="newRow">＋ 新增一列</button>
+  <form class="panel" id="rowForm" hidden>
+    <div class="grid2">
+      <div class="field"><label for="rf-part">部位編號</label><input id="rf-part" class="num" list="parts" autocomplete="off" placeholder="例：P0208-6"><datalist id="parts">${S.piles.filter(p=>["drill","pour","idle"].includes(pileStatus(p))&&canStart(pierOf(p.pier))).slice(0,60).map(p=>`<option value="${p.no}">`).join("")}${S.piers.map(p=>`<option value="${p.id}-樁帽">`).join("")}</datalist></div>
+      <div class="field"><label for="rf-item">工項</label><select id="rf-item">${ITEMS.map(x=>`<option>${x}</option>`).join("")}</select></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label for="rf-status">狀態</label><select id="rf-status"><option>施工</option><option>未施工</option><option>預定</option></select></div>
+      <div class="field" id="rf-reasonW" hidden><label for="rf-reason">未施工原因</label><select id="rf-reason">${REASONS.map(x=>`<option>${x}</option>`).join("")}</select></div>
+    </div>
+    ${crewFields("rf")}
+    <p class="hint">日報會寫成「廠商*人數 機具*台數」，例如：基樁甲*8 搖管機*1 吊車*1</p>
+    <div class="field" id="rf-doneW" hidden><label><input id="rf-done" type="checkbox"> 已鑽至設計樁底</label></div>
+    <div class="field" id="rf-cageW" hidden><label><input id="rf-cage" type="checkbox"> 鋼筋籠加工完成</label></div>
+    <div class="grid3" id="rf-concW" hidden>
+      <div class="field"><label for="rf-conc">實際澆置 m³</label><input id="rf-conc" class="num" type="number" step="0.1" min="0" inputmode="decimal"></div>
+      <div class="field"><label for="rf-trucks">車數</label><input id="rf-trucks" class="num" type="number" min="0" inputmode="numeric"></div>
+      <div class="field"><label for="rf-samples">取樣組</label><input id="rf-samples" class="num" type="number" min="0" inputmode="numeric" value="1"></div>
+    </div>
+    <div class="grid2" id="rf-payW" hidden>
+      <div class="field"><label for="rf-pay">計價項目</label><select id="rf-pay"><option value="">不計價</option>${PAY_MANUAL.map(x=>`<option value="${x.code}">${x.code} ${x.name}</option>`).join("")}</select></div>
+      <div class="field"><label for="rf-payq">數量</label><input id="rf-payq" class="num" type="number" step="0.1" min="0" inputmode="decimal"></div>
+    </div>
+    <div class="field"><label for="rf-note">說明</label><input id="rf-note" placeholder="選填"></div>
+    <p class="hint" id="rf-hint">基樁和樁帽澆置的計價數量會自動算（基樁依樁長、樁帽依鋼筋量和實際方數）；圍籬、打除、移植、JSG 在上面手填。</p>
+    <div class="form-actions"><button class="btn ghost" type="button" id="cancelRow">取消</button><button class="btn primary" type="submit">儲存</button></div>
+  </form>
+  <section class="panel stack">
+    <div class="head-row"><span class="label">查驗</span><button class="btn small" type="button" id="newIns">＋ 新增查驗</button></div>
+    <div>${ins.map(insLine).join("")||`<p class="hint">這天沒有查驗</p>`}</div>
+    <form class="stack" id="insForm" hidden>
+      <div class="grid2">
+        <div class="field"><label for="if-part">部位編號</label><input id="if-part" class="num" list="parts" autocomplete="off" placeholder="例：P0208-5"></div>
+        <div class="field"><label for="if-item">查驗項目</label><select id="if-item">${Object.entries(INSP).map(([k,a])=>`<optgroup label="${k}">${a.map(x=>`<option>${x}</option>`).join("")}</optgroup>`).join("")}</select></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label for="if-sheet">檢查表編號</label><input id="if-sheet" class="num" placeholder="選填"></div>
+      </div>
+      <label><input id="if-witness" type="checkbox" checked> 監造會同</label>
+      <p class="hint">只記錄合格的查驗。</p>
+      <div class="form-actions"><button class="btn ghost" type="button" id="cancelIns">取消</button><button class="btn primary" type="submit">儲存查驗</button></div>
+    </form>
+  </section>`;
+}
+function toggleRowFields(){
+  const item=document.getElementById("rf-item").value, st=document.getElementById("rf-status").value;
+  document.getElementById("rf-reasonW").hidden=st!=="未施工";
+  document.getElementById("rf-doneW").hidden=!(item==="鑽掘"&&st==="施工");
+  document.getElementById("rf-cageW").hidden=!(item==="鋼筋籠加工"&&st==="施工");
+  document.getElementById("rf-payW").hidden=!(PAY_ITEMS.includes(item)&&st==="施工");
+  document.getElementById("rf-concW").hidden=!((item==="混凝土澆置"||item==="基礎混凝土澆置")&&st==="施工");
+}
+
+/* ---------- 計價數量 ---------- */
+function payItemBy(key){return ((S.cfg&&S.cfg.payItems)||[]).find(x=>x.key===key)}
+function pilePay(p){
+  const it=payItemBy(p.payClass);
+  return it?[it.code,it.name]:["（項次待補）","基樁（"+(p.payClass||"未分類")+"）"];
+}
+function payLines(l){
+  const out=[]; if(l.status!=="施工") return out;
+  const p=pileOf(l.part);
+  if(l.item==="混凝土澆置"&&p&&l.conc!=null){const [code,name]=pilePay(p);out.push({code,name,unit:"M",qty:p.L,part:l.part})}
+  if(l.item==="基礎混凝土澆置"&&l.conc!=null){
+    const pr=pierOf(l.part.replace(/-樁帽$/,""));
+    if(pr){const pre=/站$/.test(pr.seg)?pr.seg+"樁帽":"高架樁帽", rb=payItemBy(pre+"鋼筋"), cc=payItemBy(pre+"混凝土");
+           out.push({code:rb?rb.code:"（項次待補）",name:rb?rb.name+"（樁帽，依規格估算）":"樁帽鋼筋（依規格估算）",unit:"T",qty:pr.capRebar,part:l.part});
+           out.push({code:cc?cc.code:"（項次待補）",name:cc?cc.name:"樁帽混凝土",unit:"M3",qty:l.conc,part:l.part})}
+  }
+  if(l.payCode&&l.payQty){const m=PAY_MANUAL.find(x=>x.code===l.payCode);out.push({code:l.payCode,name:m?m.name:"",unit:m?m.unit:"",qty:l.payQty,part:l.part})}
+  return out;
+}
+function payGroup(rows){
+  const g={};
+  rows.flatMap(payLines).forEach(x=>{const k=x.code+"|"+x.name;(g[k]||(g[k]={...x,qty:0,parts:[]})).qty+=x.qty;g[k].parts.push(x.part)});
+  return Object.values(g);
+}
+const fq=n=>Number.isInteger(n)?n.toLocaleString("zh-TW"):n.toLocaleString("zh-TW",{maximumFractionDigits:2});
+
+/* ---------- 日報（照管制表格式，貼 LINE 用） ---------- */
+// 日報的查驗寫法：P0204-1基樁鋼筋籠加工、P0204樁帽鋼筋組立
+const INSP_NAME={"(一)鑽掘":"孔深及垂直度查驗","(二)鋼筋籠":"鋼筋籠加工","(三)混凝土澆置":"混凝土取樣","混凝土澆置":"混凝土取樣","開挖/支撐":"開挖支撐","鋼筋":"鋼筋組立","模板":"模板組立"};
+function inspText(x){
+  const cap=/-樁帽$/.test(x.part), base=cap?x.part.replace(/-樁帽$/,""):x.part;
+  return `${base}${cap?"樁帽":pileOf(base)?"基樁":""}${INSP_NAME[x.item]||x.item}`;
+}
+function reportText(d){
+  const w=S.weather[d]||["",""];
+  const rows=S.logs.filter(l=>l.date===d);
+  const done=rows.filter(l=>l.status==="施工"), stop=rows.filter(l=>l.status==="未施工");
+  const next=S.logs.filter(l=>l.date===addDays(d,1)&&l.status==="預定");
+  let t=`${d}\n上午：${w[0]||"—"} 下午：${w[1]||"—"}\n今日施作:\n`;
+  t+=done.length?done.map((l,i)=>`${i+1}.${l.part} ${l.item}${l.crew?" "+l.crew:""}`).join("\n"):"（無）";
+  if(stop.length) t+=`\n未施作:\n`+stop.map((l,i)=>`${i+1}.${l.part} ${l.item}（${l.reason||"—"}）`).join("\n");
+  done.filter(l=>(l.item==="混凝土澆置"||l.item==="基礎混凝土澆置")&&l.conc!=null).forEach(l=>{
+    const p=pileOf(l.part), pr=pierOf(l.part.replace(/-樁帽$/,""));
+    const dv=p?f1(overVol(p)):(pr?f1(pr.capVol):"—");
+    t+=`\n\n${l.part} ${l.item}\n設計${dv}立方，實際${f1(l.conc)}立方，共${l.trucks||"—"}車 混凝土取樣${l.samples||0}組`;
+  });
+  const ins=S.insps.filter(x=>x.date===d);
+  if(ins.length) t+=`\n\n查驗:\n`+ins.map((x,i)=>`${i+1}.${inspText(x)}`).join("\n");
+  const pays=payGroup(done);
+  if(pays.length) t+=`\n\n今日計價數量:\n`+pays.map((x,i)=>`${i+1}.${x.code} ${x.name}\n   ${fq(x.qty)} ${x.unit}（${x.parts.join("、")}）`).join("\n");
+  t+=`\n\n明日施作:\n`+(next.length?next.map((l,i)=>`${i+1}.${l.part} ${l.item}${l.crew?" "+l.crew:""}`).join("\n"):"（尚未排定）");
+  return t;
+}
+function vReport(){
+  const d=S.repDate;
+  return `<div><h2>日報</h2><p class="sub">依每日紀錄自動產生，按「複製」後直接貼到 LINE 群組</p></div>
+  <div class="datebar"><button class="btn small" type="button" data-rday="-1" aria-label="前一天">‹</button><input id="repDate" class="num" value="${d}" aria-label="日期"><button class="btn small" type="button" data-rday="1" aria-label="後一天">›</button></div>
+  <pre class="report" id="reportBox">${esc(reportText(d))}</pre>
+  <button class="btn primary" type="button" id="copyReport">複製日報</button>
+  <p class="hint">「明日施作」取自隔天狀態為「預定」的紀錄，可以在月曆排，也可以用下面的建議一鍵加入。</p>
+  ${sugBlock(d)}`;
+}
+function sugBlock(d){
+  const sg=suggestTomorrow(d), next=addDays(d,1);
+  const rem=autoReminders(d);
+  return `<section class="panel stack"><div class="head-row"><span class="label">明日預計建議（${next}）</span>${sg.length?`<button class="btn small" type="button" id="sugAll">全部加入</button>`:""}</div>
+    <div>${sg.map((x,i)=>`<div class="sug"><span class="v"><span class="num">${esc(x.part)}</span> ${esc(x.item)}<small>${esc(x.why)}${x.crew?"・"+esc(x.crew):""}</small></span><button class="btn small primary" type="button" data-sug="${i}">加入</button></div>`).join("")||`<p class="hint">沒有其他建議，明日施作都排好了。</p>`}</div>
+    ${rem.length?`<div class="dsec">${rem.map(r=>`<div class="dline"><span class="k"><span class="chip warn">!提醒</span></span><span class="v">${esc(r)}</span></div>`).join("")}</div>`:""}
+  </section>`;
+}
+
+/* ---------- 材料 ---------- */
+function vMaterial(){
+  const ms=S.materials.filter(m=>S.area==="all"||m.area===S.area), manual=ms.filter(m=>!m.auto);
+  return `<div class="head-row"><div><h2>材料</h2><p class="sub">設計量、累計進場與使用量</p></div><button class="btn primary" type="button" id="newMat">＋ 登記</button></div>
+  <form class="panel" id="matForm" hidden>
+    <div class="field"><label for="mf-name">材料</label><select id="mf-name">${manual.map((m,i)=>`<option value="${i}">${esc(m.name)}（${m.unit}）</option>`).join("")}</select></div>
+    <div class="grid2"><div class="field"><label for="mf-type">類別</label><select id="mf-type"><option value="in">進場</option><option value="use">使用</option></select></div>
+    <div class="field"><label for="mf-qty">數量</label><input id="mf-qty" class="num" type="number" min="0" step="0.1" inputmode="decimal"></div></div>
+    <p class="hint">混凝土依每日紀錄的澆置方量自動加總，不用在這裡登記。</p>
+    <div class="form-actions"><button class="btn ghost" type="button" id="cancelMat">取消</button><button class="btn primary" type="submit">儲存</button></div>
+  </form>
+  <section class="list">${ms.map(m=>{
+    const au=m.auto==='cap'?capUsed():concUsed(), inn=m.auto?au:m.inn, used=m.auto?au:m.used;
+    return `<article class="card"><div class="head-row"><h3>${esc(m.name)}</h3>${m.auto?`<span class="chip steel">依澆置自動計算</span>`:`<span class="chip steel">庫存 <span class="num">${f1(inn-used)}</span> ${m.unit}</span>`}</div>
+      ${m.auto?"":`<div class="prog-row"><span>進場</span><div class="bar"><i style="width:${Math.min(inn/m.design*100,100)}%;opacity:.55"></i></div><span class="num">${(inn/m.design*100).toFixed(1)}%</span></div>`}
+      <div class="prog-row"><span>使用</span><div class="bar"><i style="width:${Math.min(used/m.design*100,100)}%"></i></div><span class="num">${(used/m.design*100).toFixed(1)}%</span></div>
+      <dl class="kv"><dt>設計量</dt><dd class="num">${m.design.toLocaleString("zh-TW")} ${m.unit}</dd>${m.auto?"":`<dt>累計進場</dt><dd class="num">${f1(inn)} ${m.unit}</dd>`}<dt>累計使用</dt><dd class="num">${f1(used)} ${m.unit}</dd></dl></article>`}).join("")}</section>`;
+}
+
+/* ---------- 畫面 ---------- */
+function render(o={}){
+  if(S.tab!=="proj"&&!TABS.some(([k])=>k===S.tab)) S.tab="home";
+  document.getElementById("tabs").innerHTML=TABS.map(([k,n])=>`<button type="button" data-tab="${k}" ${S.tab===k?'aria-current="page"':""}><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg>${n}</button>`).join("");
+  document.getElementById("areaSel").value=S.area;
+  document.getElementById("projName").textContent=S.cfg?S.cfg.meta.name:"未匯入";
+  document.getElementById("todayTxt").textContent=TODAY;
+  const v=document.getElementById("view");
+  v.innerHTML=(!S.cfg||S.tab==="proj")?vProj():S.tab==="cal"?vCal():S.tab==="log"?vLog():S.tab==="report"?vReport():S.tab==="material"?vMaterial():S.area==="sub"?vSub():S.area==="all"?vAll():(S.pileView==="list"?vPile():vHome());
+  save();
+  if(o.focus){const el=document.getElementById("pile-"+o.focus);if(el){el.scrollIntoView({block:"center"});el.style.outline="2px solid var(--accent)"}}
+}
+
+document.addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  const d=b.dataset;
+  if(d.tab){S.tab=d.tab;render();scrollTo(0,0);return}
+  if(d.pier){S.openPier=S.openPier===d.pier?null:d.pier;render();return}
+  if(d.pview){S.pileView=d.pview;render();scrollTo(0,0);return}
+  if(d.sub){S.openSub=S.openSub===d.sub?null:d.sub;render();return}
+  if(d.gosub){S.area="sub";S.tab="home";S.openSub=d.gosub;render();scrollTo(0,0);return}
+  if(d.pile){S.area="pile";S.tab="home";S.pileView="list";S.pileFilter="all";S.pilePier=pileOf(d.pile).pier;S.pileLimit=40;render({focus:d.pile});return}
+  if(d.filter){S.pileFilter=d.filter;S.pileLimit=40;render();return}
+  if(d.day){S.logDate=addDays(S.logDate,+d.day);render();return}
+  if(d.rday){S.repDate=addDays(S.repDate,+d.rday);render();return}
+  if(b.id==="clearPier"){S.pilePier="";render();return}
+  if(b.id==="morePiles"){S.pileLimit+=40;render();return}
+  if(b.id==="newRow"){document.getElementById("rowForm").hidden=false;b.hidden=true;toggleRowFields();document.getElementById("rf-part").focus();return}
+  if(b.id==="newMat"){document.getElementById("matForm").hidden=false;b.hidden=true;return}
+  if(d.gm){S.goalSel=shiftMonth(S.goalSel||TODAY.slice(0,7),+d.gm);render();return}
+  if(d.mm){const [k,n]=d.mm.split("|");S.planSel[k]=shiftMonth(S.planSel[k]||TODAY.slice(0,7),+n);render();return}
+  if(d.goarea){S.area=d.goarea;S.tab="home";render();scrollTo(0,0);return}
+  if(d.gocal){S.tab="cal";S.calSel=d.gocal;S.calMonth=d.gocal.slice(0,7);render();scrollTo(0,0);return}
+  if(d.cm){S.calMonth=shiftMonth(S.calMonth,+d.cm);render();return}
+  if(d.cv){S.calView=d.cv;render();return}
+  if(d.cplan){S.calSel=d.cplan;render();document.getElementById("planForm").hidden=false;document.getElementById("addPlan").hidden=true;document.getElementById("dayPanel").scrollIntoView({block:"start"});return}
+  if(d.cd){S.calSel=d.cd;render();const dp=document.getElementById("dayPanel");if(dp)dp.scrollIntoView({block:"nearest"});return}
+  if(d.delplan){S.logs=S.logs.filter(l=>!(l.id===d.delplan&&l.status==="預定"));render();toast("已刪除預定");return}
+  if(d.delev){S.events=S.events.filter(x=>x.id!==d.delev);render();toast("已刪除");return}
+  if(d.sug){const x=suggestTomorrow(S.repDate)[+d.sug];if(x){S.logs.push({id:Date.now().toString(36),date:addDays(S.repDate,1),part:x.part,item:x.item,status:"預定",crew:x.crew,note:"",reason:""});render();toast("已加入明日預定")}return}
+  if(b.id==="sugAll"){const nd=addDays(S.repDate,1);suggestTomorrow(S.repDate).forEach((x,i)=>S.logs.push({id:Date.now().toString(36)+i,date:nd,part:x.part,item:x.item,status:"預定",crew:x.crew,note:"",reason:""}));render();toast("已全部加入");return}
+  if(b.id==="addPlan"){document.getElementById("planForm").hidden=false;b.hidden=true;document.getElementById("pl-part").focus();return}
+  if(b.id==="addEv"){document.getElementById("evForm").hidden=false;b.hidden=true;document.getElementById("ev-title").focus();return}
+  if(b.id==="cancelPlan"||b.id==="cancelEv"){render();return}
+  if(b.id==="newIns"){document.getElementById("insForm").hidden=false;b.hidden=true;document.getElementById("if-part").focus();return}
+  if(b.id==="cancelRow"||b.id==="cancelMat"||b.id==="cancelIns"){render();return}
+  if(b.id==="copyReport"){
+    const txt=reportText(S.repDate);
+    const fallback=()=>{const r=document.createRange();r.selectNodeContents(document.getElementById("reportBox"));const s=getSelection();s.removeAllRanges();s.addRange(r);toast("已選取，請按複製")};
+    try{navigator.clipboard.writeText(txt).then(()=>toast("已複製，可以貼到 LINE"),fallback)}catch(err){fallback()}
+    return;
+  }
+  if(b.id==="reset"){S.tab="proj";render();scrollTo(0,0);return}
+});
+document.addEventListener("change",e=>{
+  const id=e.target.id;
+  if(id.startsWith("plan-")){
+    const [,kind,y,m]=id.split("-"), v=Math.max(0,Math.round(+e.target.value||0));
+    S.plan[kind][`${y}/${m}`]=v; S.planOpen[kind]=true; render(); toast("已更新預定數量"); return;
+  }
+  if(e.target.dataset&&e.target.dataset.pre){
+    const [no,i]=e.target.dataset.pre.split("|"), p=pileOf(no); if(!p) return;
+    p.pre=p.pre||{}; if(e.target.checked) p.pre[i]=TODAY; else delete p.pre[i];
+    const c=document.getElementById("prec-"+no); if(c) c.textContent=`${preDone(p)}/${DRILL_PRE.length}`;
+    save(); return;
+  }
+  if(e.target.dataset&&e.target.dataset.evdone){const x=S.events.find(v=>v.id===e.target.dataset.evdone);if(x){x.done=e.target.checked;render()}return}
+  if(id==="areaSel"){S.area=e.target.value;render();scrollTo(0,0);return}
+  if(id==="rf-item"||id==="rf-status") toggleRowFields();
+  if(id==="pf-s"){S.pileSeg=e.target.value;S.pileLimit=40;render()}
+  if(id==="w-am"||id==="w-pm"){const w=S.weather[S.logDate]||["",""];w[id==="w-am"?0:1]=e.target.value;S.weather[S.logDate]=w;save();toast("已儲存天氣")}
+  if(id==="logDate"||id==="repDate"){const v=e.target.value.trim().replace(/-/g,"/");if(!validDate(v)){toast("日期格式：2026/10/29");render();return}S[id]=v;render()}
+});
+let qT;
+document.addEventListener("toggle",e=>{ if(e.target.dataset&&e.target.dataset.pt){ S.planOpen[e.target.dataset.pt]=e.target.open; save() } },true);
+document.addEventListener("input",e=>{
+  if(e.target.id!=="pf-q") return;
+  clearTimeout(qT);
+  qT=setTimeout(()=>{S.pileQuery=e.target.value;S.pileLimit=40;render();const x=document.getElementById("pf-q");if(x){x.focus();x.setSelectionRange(x.value.length,x.value.length)}},250);
+});
+document.addEventListener("submit",e=>{
+  e.preventDefault();
+  const g=id=>document.getElementById(id).value.trim();
+  if(e.target.id==="rowForm"){
+    const part=g("rf-part").toUpperCase(), item=g("rf-item"), status=g("rf-status");
+    const pile=pileOf(part);
+    if(!part){toast("請填部位編號");return}
+    const pileItems=["樁位放樣","鑽掘","鋼筋籠加工","混凝土澆置","空鑽回填","完整性試驗","樁頭打除"];
+    if(pileItems.includes(item)&&!pile){toast("找不到這支基樁");return}
+    const row={id:Date.now().toString(36),date:S.logDate,part,item,status,...readCrew("rf"),note:g("rf-note"),reason:status==="未施工"?g("rf-reason"):""};
+    if(pile&&status==="施工"){
+      if(item==="鑽掘"){pile.drilling=true;if(document.getElementById("rf-done").checked){pile.drilled=S.logDate;row.done=true}}
+      if(item==="鋼筋籠加工"){pile.cageWip=true;if(document.getElementById("rf-cage").checked){pile.cage=S.logDate;row.done=true}}
+      if(item==="混凝土澆置"){
+        const c=parseFloat(g("rf-conc")); if(!(c>0)){toast("請填實際澆置方量");return}
+        if(!pile.drilled){toast("這支樁還沒鑽到設計樁底");return}
+        Object.assign(row,{conc:c,trucks:+g("rf-trucks")||null,samples:+g("rf-samples")||0});
+        Object.assign(pile,{conc:c,trucks:row.trucks,pour:S.logDate});
+        if(!pile.cage) pile.cage=S.logDate;
+      }
+    }
+    if(/-樁帽$/.test(part)&&status==="施工"){
+      const pr=pierOf(part.replace(/-樁帽$/,"")), i=CAP_STEPS.indexOf(item);
+      if(pr&&i>=0){
+        if(S.piles.some(p=>p.pier===pr.id&&p.conc==null)){toast("這個墩的基樁還沒全部澆置");return}
+        if(item==="基礎混凝土澆置"){const c=parseFloat(g("rf-conc"));if(!(c>0)){toast("請填實際澆置方量");return}Object.assign(row,{conc:c,trucks:+g("rf-trucks")||null,samples:+g("rf-samples")||0});pr.capConc=c}
+        pr.capDates[item]=S.logDate; if(i>pr.cap) pr.cap=i;
+      }
+    }
+    if(PAY_ITEMS.includes(item)&&status==="施工"&&g("rf-pay")){const q=parseFloat(g("rf-payq"));if(!(q>0)){toast("請填計價數量");return}row.payCode=g("rf-pay");row.payQty=q}
+    S.logs.push(row); render(); toast("已新增紀錄");
+  }
+  if(e.target.id==="goalForm"){
+    const text=g("goal-in"), m=S.goalSel||TODAY.slice(0,7), r=parsePiers(text);
+    if(r.bad.length){toast("找不到："+r.bad.join("、"));return}
+    S.monthGoals=S.monthGoals||{};
+    if(!r.ids.length){delete S.monthGoals[m];render();toast("已清除這個月的目標");return}
+    S.monthGoals[m]={text,piers:r.ids};
+    S.plan.pile[m]=S.piles.filter(p=>r.ids.includes(p.pier)).length; // 單月預定支數跟著目標
+    render(); toast(`已設定 ${r.ids.length} 座墩、${S.plan.pile[m]} 支基樁`); return;
+  }
+  if(e.target.id==="planForm"){
+    const part=g("pl-part").toUpperCase(); if(!part){toast("請填部位");return}
+    const n=addPlans(part,g("pl-item"),readCrew("pl").crew,Math.max(1,+g("pl-count")||1),Math.max(1,+g("pl-per")||1),document.getElementById("pl-sun").checked,S.calSel);
+    render(); toast(`已排入 ${n} 筆預定，可到「本月預定表」查看`); return;
+  }
+  if(e.target.id==="evForm"){
+    const t=g("ev-title"); if(!t){toast("請填內容");return}
+    S.events.push({id:"e"+Date.now().toString(36),date:S.calSel,type:g("ev-type"),title:t,done:false});
+    render(); toast("已加入"); return;
+  }
+  if(e.target.id==="insForm"){
+    const part=g("if-part").toUpperCase(), item=g("if-item"), result="合格";
+    if(!part){toast("請填部位編號");return}
+    const pile=pileOf(part);
+    if(!pile&&!/-樁帽$/.test(part)&&!pierOf(part)){toast("找不到這個部位編號");return}
+    S.insps.push({date:S.logDate,part,item,sheet:g("if-sheet"),witness:document.getElementById("if-witness").checked,result});
+    if(pile&&INSP["基樁"].includes(item)) pile.insp[item]=result;
+    render(); toast("已新增查驗");
+  }
+  if(e.target.id==="matForm"){
+    const m=S.materials.filter(x=>(S.area==="all"||x.area===S.area)&&!x.auto)[+g("mf-name")], q=parseFloat(g("mf-qty"));
+    if(!m||!(q>0)){toast("請輸入數量");return}
+    if(g("mf-type")==="use"&&m.used+q>m.inn){toast("使用量不能超過進場量");return}
+    if(g("mf-type")==="in")m.inn=Math.round((m.inn+q)*10)/10;else m.used=Math.round((m.used+q)*10)/10;
+    render();toast("已登記");
+  }
+});
+/* ---------- 專案頁：匯入 Excel／專案資料、備份、匯出給 Excel ---------- */
+function vProj(){
+  const c=S.cfg;
+  const poured=S.piles.filter(p=>p.conc!=null).length;
+  return `<div><h2>專案</h2><p class="sub">${c?esc(c.meta.name):"還沒有匯入專案，請先匯入"}</p></div>
+  <section class="panel stack"><span class="label">匯入專案</span>
+    <p class="hint">選施工管制表 Excel（讀「部位主檔」「設定」「管線地改」三個分頁）或專案資料 .json。已填的進度和紀錄會保留，只更新部位與設定。檔案只在這個瀏覽器裡讀取，不會上傳。</p>
+    <div class="field"><label for="projNameIn">案名</label><input id="projNameIn" value="${esc(c?c.meta.name:"")}" placeholder="例：BC11"></div>
+    <div class="field"><label for="projFile">選擇檔案</label><input id="projFile" type="file" accept=".xlsx,.xlsm,.xls,.json"></div>
+  </section>
+  ${c?`<section class="panel stack"><span class="label">目前的專案</span>
+    <dl class="kv"><dt>墩</dt><dd class="num">${S.piers.length}</dd><dt>基樁</dt><dd class="num">${S.piles.length}（已澆置 ${poured}）</dd><dt>樁帽規格</dt><dd class="num">${Object.keys(c.capSpecs).length} 種</dd><dt>每日紀錄</dt><dd class="num">${S.logs.length} 列</dd><dt>查驗</dt><dd class="num">${S.insps.length} 筆</dd></dl>
+  </section>
+  <section class="panel stack"><span class="label">匯出給 Excel</span>
+    <p class="hint">下載 CSV，用 Excel 開啟後，整列複製貼進施工管制表對應分頁的藍色欄位（從第一個空白列開始貼）。</p>
+    <div class="form-actions" style="justify-content:flex-start;flex-wrap:wrap">
+      <button class="btn" type="button" id="expLog">每日紀錄</button><button class="btn" type="button" id="expInsPile">查驗_基樁</button><button class="btn" type="button" id="expInsSub">查驗_下構</button></div>
+  </section>
+  <section class="panel stack"><span class="label">備份</span>
+    <p class="hint">資料只存在這個瀏覽器，換手機或清除瀏覽資料前先匯出備份。</p>
+    <div class="form-actions" style="justify-content:flex-start;flex-wrap:wrap">
+      <button class="btn" type="button" id="expState">匯出備份</button>
+      <label class="btn" style="cursor:pointer">匯入備份<input id="stateFile" type="file" accept=".json" hidden></label>
+      <button class="btn ghost" type="button" id="clearProg" style="color:var(--bad)">清空所有進度與紀錄</button></div>
+  </section>`:""}`;
+}
+
+// 讀 Excel 的「設定」「部位主檔」，轉成專案資料（邏輯與 工具/excel轉專案資料.py 相同）
+function parseExcel(wb){
+  const sheet=n=>{const ws=wb.Sheets[n];if(!ws)throw new Error("找不到分頁「"+n+"」");return XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null})};
+  const st=sheet("設定"), pm=sheet("部位主檔");
+  const cell=(a,r,c)=>{const row=a[r-1];return row?row[c-1]:null};
+  const txt=v=>v==null?"":String(v).trim();
+  const num=v=>v==null||v===""||isNaN(+v)?null:Math.round(+v*1000)/1000;
+  const findRow=(a,col,t)=>{for(let r=1;r<=a.length;r++) if(txt(cell(a,r,col)).startsWith(t)) return r;return 0};
+  const col=(a,c,first,last)=>{const o=[];for(let r=first;r<=last;r++){const v=txt(cell(a,r,c));if(v)o.push(v)}return o};
+
+  const lastList=(findRow(st,1,"樁帽規格")||41)-1;
+  const items=[];
+  for(let r=4;r<=lastList;r++){const n=txt(cell(st,r,4));if(n)items.push({name:n,short:txt(cell(st,r,5))||n})}
+  const lists={items,reasons:col(st,6,4,lastList),inspPile:col(st,7,4,lastList),inspSub:col(st,9,4,lastList),weather:col(st,13,4,lastList),
+    manualPay:col(st,14,4,lastList).map(t=>{const i=t.indexOf(" ");return {code:i<0?t:t.slice(0,i),name:i<0?"":t.slice(i+1)}})};
+
+  const capSpecs={}, r0=findRow(st,1,"基礎型式");
+  if(!r0) throw new Error("「設定」分頁找不到樁帽規格表");
+  for(let r=r0+1;txt(cell(st,r,1));r++) capSpecs[txt(cell(st,r,1))]={x:num(cell(st,r,2)),y:num(cell(st,r,3)),h:num(cell(st,r,4)),piles:num(cell(st,r,5)),drawing:cell(st,r,6),conc:num(cell(st,r,7)),form:num(cell(st,r,8)),rebar:num(cell(st,r,9))};
+
+  const payItems=[], p0=findRow(st,1,"計價鍵");
+  if(p0) for(let r=p0+1;txt(cell(st,r,1));r++) payItems.push({key:txt(cell(st,r,1)),code:cell(st,r,2),name:cell(st,r,3),unit:cell(st,r,4),qty:num(cell(st,r,5)),ownerPrice:num(cell(st,r,6)),source:cell(st,r,8),note:cell(st,r,9)});
+
+  const piers={}, piles=[], sections=[];
+  for(let r=5;r<=pm.length;r++){
+    const id=txt(cell(pm,r,1)), typ=txt(cell(pm,r,2));
+    if(!id) continue;
+    if(typ==="墩") piers[id]={id,seg:txt(cell(pm,r,4)),form:txt(cell(pm,r,5)),count:0,L:null};
+    else if(typ==="基樁") piles.push({no:id,pier:txt(cell(pm,r,3)),dia:num(cell(pm,r,7)),L:num(cell(pm,r,8)),payClass:txt(cell(pm,r,15))});
+    else if(typ==="路段") sections.push({id,note:cell(pm,r,10)});
+  }
+  if(!piles.length) throw new Error("「部位主檔」找不到基樁，請確認 A 欄是部位編號、B 欄是部位類型");
+  piles.forEach(p=>{const pr=piers[p.pier];if(pr){pr.count++;pr.L=pr.L||p.L}});
+  // 「管線地改」分頁：每墩的交維、管線、地改（判斷能不能開工）
+  let pre=null;
+  const ws=wb.Sheets["管線地改"];
+  if(ws){
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+    const h=rows.findIndex(r=>txt(r&&r[0])==="墩號");
+    if(h>=0){
+      const head=rows[h].map(v=>txt(v).replace(/\s+/g,""));
+      const col=k=>head.findIndex(v=>v.startsWith(k));
+      const cT=col("交維"), cNeed=col("需遷移"), cPipe=col("遷移狀態"), cSoilNeed=col("需地盤"), cSoil=col("地改狀態");
+      pre={};
+      rows.slice(h+1).forEach(r=>{
+        const id=txt(r&&r[0]); if(!id||!piers[id]) return;
+        const need=txt(r[cNeed]), soilNeed=txt(r[cSoilNeed]);
+        pre[id]={traffic:txt(r[cT])||"未確認",
+                 pipe:need==="否"?"不需":(txt(r[cPipe])||"未確認"),
+                 soil:txt(r[cSoil])||(soilNeed==="是"?"未施作":"不需")};
+      });
+    }
+  }
+  return {schema:1,meta:{name:"",overPour:num(cell(st,4,2))},lists,capSpecs,payItems,piers:Object.values(piers),piles,sections,pre};
+}
+
+function importProject(proj,name){
+  if(!proj||proj.schema!==1||!Array.isArray(proj.piles)||!proj.lists) throw new Error("這不是正確的專案資料");
+  const had=S.piles.length>0;
+  if(had&&!confirm("要用這份檔案更新專案嗎？\n新的部位 "+proj.piles.length+" 支基樁。已填的進度和紀錄會保留。")) return;
+  fromProject(proj,name);
+  S.tab="home"; render(); scrollTo(0,0);
+  toast("已匯入：墩 "+S.piers.length+"、基樁 "+S.piles.length);
+}
+
+/* 匯出給 Excel（貼進對應分頁的藍色欄位） */
+function dl(name,content,mime){
+  const a=document.createElement("a"), u=URL.createObjectURL(new Blob([content],{type:mime}));
+  a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);
+}
+const csvCell=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';
+const toCsv=rows=>"﻿"+rows.map(r=>r.map(csvCell).join(",")).join("\r\n");
+const dash=s=>s.replace(/\//g,"-");
+const stamp=()=>fmt(new Date()).replace(/\//g,"");
+function exportLog(){
+  const seen=new Set(), rows=[];
+  S.logs.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(l=>{
+    const w=S.weather[l.date]||["",""], first=!seen.has(l.date); seen.add(l.date);
+    const pm=l.payCode?PAY_MANUAL.find(x=>x.code===l.payCode):null;
+    rows.push([dash(l.date),l.part,l.item,l.status,l.status==="未施工"?l.reason:"",l.crew||"",l.note||"",
+      l.conc!=null?l.conc:"",l.trucks||"",l.samples||"","","","",pm?pm.code+" "+pm.name:(l.payCode||""),l.payQty||"",first?w[0]:"",first?w[1]:""]);
+  });
+  dl("每日紀錄_"+stamp()+".csv",toCsv(rows),"text/csv");
+}
+function exportIns(sub){
+  const rows=S.insps.filter(x=>/-樁帽$/.test(x.part)===sub).sort((a,b)=>a.date.localeCompare(b.date))
+    .map(x=>[dash(x.date),x.part,x.item,"",x.sheet||"",x.witness?"是":""]); // D 欄在 Excel 是空的，要留空才會對齊
+  dl((sub?"查驗_下構_":"查驗_基樁_")+stamp()+".csv",toCsv(rows),"text/csv");
+}
+
+document.addEventListener("click",e=>{
+  const id=e.target.closest("button")?.id;
+  if(id==="expLog") exportLog();
+  else if(id==="expInsPile") exportIns(false);
+  else if(id==="expInsSub") exportIns(true);
+  else if(id==="expState") dl("工地管制備份_"+stamp()+".json",JSON.stringify(S),"application/json");
+  else if(id==="clearProg"){
+    if(!confirm("確定清空所有進度與紀錄？部位與設定會保留，但每日紀錄、查驗、澆置進度都會消失。\n（建議先匯出備份）")) return;
+    S.logs=[];S.insps=[];S.weather={};S.events=[];
+    S.piles.forEach(p=>Object.assign(p,{drilling:false,drilled:null,cageWip:false,cage:null,conc:null,trucks:null,pour:null,test:null,insp:{}}));
+    S.piers.forEach(p=>Object.assign(p,{cap:-1,capDates:{},capConc:null}));
+    S.materials.forEach(m=>{if(!m.auto){m.inn=0;m.used=0}});
+    render();toast("已清空");
+  }
+});
+document.addEventListener("change",async e=>{
+  const f=e.target.files&&e.target.files[0];
+  if(!f) return;
+  try{
+    if(e.target.id==="projFile"){
+      const name=(document.getElementById("projNameIn").value||"").trim();
+      if(/\.json$/i.test(f.name)) importProject(JSON.parse(await f.text()),name);
+      else{
+        if(typeof XLSX==="undefined") throw new Error("讀 Excel 的元件沒載入（需要網路）。可先用電腦轉成專案資料 .json 再匯入。");
+        const proj=parseExcel(XLSX.read(await f.arrayBuffer(),{type:"array",sheets:["設定","部位主檔","管線地改"]}));
+        importProject(proj,name||f.name.replace(/\.[^.]+$/,""));
+      }
+    }else if(e.target.id==="stateFile"){
+      const s=JSON.parse(await f.text());
+      if(!s||s.ver!==VER||!Array.isArray(s.piles)) throw new Error("這不是正確的備份檔");
+      if(!confirm("匯入備份會取代目前所有資料，確定嗎？")) return;
+      S=s; if(S.cfg) applyCfg(); render(); toast("已匯入備份");
+    }
+  }catch(err){alert("匯入失敗："+err.message)}
+  e.target.value="";
+});
+
+render();
+</script>
+
+</body>
+</html>
