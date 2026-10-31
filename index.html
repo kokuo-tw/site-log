@@ -395,7 +395,7 @@ try{S=JSON.parse(localStorage.getItem("site-ctl-v1")||"null")}catch(e){S=null}
 if(!S||S.ver!==VER) S=emptyState();
 if(S.cfg) applyCfg();
 S.logDate=S.repDate=S.calSel=TODAY; S.calMonth=TODAY.slice(0,7); // 每次打開都從今天開始
-if(!S.mapSeen){S.mapSeen=1;S.calView="map"} // 預排預設用配置圖（第一次升級時）
+if(S.calView==="map") S.calView="grid"; // 預排配置圖已移除
 let saveWarned=false;
 const save=()=>{try{localStorage.setItem("site-ctl-v1",JSON.stringify(S))}catch(e){if(!saveWarned){saveWarned=true;alert("這支手機的瀏覽器空間不足，資料沒有存到。請先到「專案」頁匯出備份。")}}};
 
@@ -748,11 +748,9 @@ function vCal(){
   const dsOf=d=>`${S.calMonth}/${String(d).padStart(2,"0")}`;
   const head=`<div><h2>月曆</h2><p class="sub">每天的施作、查驗、行程和提醒；點日期看詳細</p></div>
   <div class="datebar"><button class="btn small" type="button" data-cm="-1" aria-label="上個月">‹</button><b class="num" style="flex:1;text-align:center">${y} 年 ${m} 月</b><button class="btn small" type="button" data-cm="1" aria-label="下個月">›</button></div>
-  <div class="seg" role="group" aria-label="檢視方式"><button type="button" data-cv="map" aria-pressed="${S.calView==="map"}">預排配置圖</button><button type="button" data-cv="grid" aria-pressed="${S.calView!=="table"&&S.calView!=="map"}">月曆</button><button type="button" data-cv="table" aria-pressed="${S.calView==="table"}">本月預定表</button></div>`;
+  <div class="seg" role="group" aria-label="檢視方式"><button type="button" data-cv="grid" aria-pressed="${S.calView!=="table"}">月曆</button><button type="button" data-cv="table" aria-pressed="${S.calView==="table"}">本月預定表</button></div>`;
   let body;
-  if(S.calView==="map"){
-    body=`<div class="datebar"><button class="btn small" type="button" data-cs="-1" aria-label="前一天">‹</button><b class="num" style="flex:1;text-align:center">排預定的日期：${S.calSel}（${WD[toDate(S.calSel).getDay()]}）</b><button class="btn small" type="button" data-cs="1" aria-label="後一天">›</button></div>`+lmBlock("plan");
-  }else if(S.calView==="table"){
+  if(S.calView==="table"){
     const target=S.plan.pile[S.calMonth];
     const pours=S.logs.filter(l=>l.date.startsWith(S.calMonth)&&l.item==="混凝土澆置"&&l.status!=="未施工");
     const doneN=pours.filter(l=>l.status==="施工").length, planN=pours.filter(l=>l.status==="預定").length;
