@@ -543,14 +543,16 @@ function vHome(){
   ${goalBlock()}
   ${monthBlock("pile")}
   <section class="panel stack"><div class="head-row"><span class="label">樁位總覽（點墩號展開）</span><span class="sub">淡色＝前置條件未完成，還不能開工</span></div>
-    ${pierGroups().map(([sg,ps])=>`<div class="seg-title">${esc(sg)}</div><div class="pms">${ps.map(tile).join("")}</div>`).join("")}
+    ${segs.map(sg=>`<div class="seg-title">${esc(sg)}</div><div class="tiles">${S.piers.filter(p=>p.seg===sg).map(tile).join("")}</div>`).join("")}
     ${pierDetail()}
     <div class="legend"><span><i></i>未開始</span><span><i class="s-drill"></i>鑽掘中</span><span><i class="s-pour"></i>待澆置</span><span><i class="s-done"></i>完成</span><span><i class="s-bad"></i>異常</span></div>
   </section>
   ${flags.length?`<section class="list"><span class="label">需要注意</span>${flags.map(pileCard).join("")}</section>`:""}`;
 }
 function tile(pr){
-  return pierSym(pr,`data-pier="${esc(pr.id)}" aria-expanded="${S.openPier===pr.id}"`,`${S.openPier===pr.id?"on":""} ${canStart(pr)?"":"blocked"} ${S.piles.some(p=>p.pier===pr.id&&isBad(p))?"has-bad":""}`,"");
+  const ps=S.piles.filter(p=>p.pier===pr.id);
+  return `<button type="button" class="tile ${S.openPier===pr.id?"on":""} ${canStart(pr)?"":"blocked"} ${ps.some(isBad)?"has-bad":""}" data-pier="${esc(pr.id)}" aria-expanded="${S.openPier===pr.id}" aria-label="${esc(pr.id)}">
+    <span class="dots" aria-hidden="true">${ps.map(p=>`<i class="${cls(p)}"></i>`).join("")}</span><span class="tl">${esc(pr.id.replace(/^P0?/,"P"))}</span></button>`;
 }
 function preChip(name,v,okVals){return `<span class="chip ${okVals.includes(v)?"ok":"warn"}">${name}：${esc(v)}</span>`}
 /* ---------- 鑽掘前置作業（只做鑽掘，不提醒、不擋） ---------- */
