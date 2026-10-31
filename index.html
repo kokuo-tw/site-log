@@ -555,13 +555,8 @@ function tile(pr){
     <span class="dots" aria-hidden="true">${ps.map(p=>`<i class="${cls(p)}"></i>`).join("")}</span><span class="tl">${esc(pr.id.replace(/^P0?/,"P"))}</span></button>`;
 }
 function preChip(name,v,okVals){return `<span class="chip ${okVals.includes(v)?"ok":"warn"}">${name}：${esc(v)}</span>`}
-/* ---------- 鑽掘前置作業（只做鑽掘，不提醒、不擋） ---------- */
+/* ---------- 鑽掘前置工項（每日紀錄用） ---------- */
 const DRILL_PRE=["樁位放樣","機具進場","套管準備","地下管線確認"]; // 也是每日紀錄的工項；施工紀錄存檔時記到 p.pre
-const preDone=p=>DRILL_PRE.filter((_,i)=>p.pre&&p.pre[i]).length;
-function preList(p){
-  const done=DRILL_PRE.filter((_,i)=>p.pre&&p.pre[i]);
-  return `<div class="note">鑽掘前置作業 <span class="num">${done.length}/${DRILL_PRE.length}</span>${done.length?`（${done.map(x=>SHORT[x]||x).join("、")}）`:""}</div>`;
-}
 function pierDetail(){
   const pr=pierOf(S.openPier); if(!pr) return `<p class="hint">點任一個墩號，展開看每支樁和開工條件</p>`;
   const ps=S.piles.filter(p=>p.pier===pr.id);
@@ -570,7 +565,6 @@ function pierDetail(){
     <div class="head-row"><h3 class="num" style="margin:0">${esc(pr.id)}</h3><span class="chip ${canStart(pr)?"ok":"warn"}">${canStart(pr)?"可開工":"還不能開工"}</span></div>
     <div class="note">${esc(pr.seg)}　·　基礎型式 ${esc(pr.form)}　·　${pr.count} 支　·　樁長 <span class="num">${pr.L}</span> m</div>
     <div class="pre">${preChip("交維",pr.traffic,["核定","已核定"])}${preChip("管線",pr.pipe,["不需","完成"])}${preChip("地改",pr.soil,["不需","完成"])}</div>
-    <div class="note">鑽掘前置作業完成：<span class="num">${S.piles.filter(p=>p.pier===pr.id&&preDone(p)===DRILL_PRE.length).length} / ${pr.count}</span> 支</div>
     <div class="cells">${ps.map(p=>`<button type="button" class="cell ${cls(p)}" data-pile="${esc(p.no)}" aria-label="${esc(p.no)} ${STATUS[pileStatus(p)].t}">${p.no.split("-").pop()}</button>`).join("")}</div>
     <button type="button" class="btn small" style="align-self:flex-start" data-gosub="${esc(pr.id)}">看 ${esc(pr.id)} 樁帽（下構）›</button>
   </div>`;
@@ -595,7 +589,6 @@ function pileCard(p){
       <div><span class="label">實際</span><span class="num">${f1(p.conc)} m³</span></div>
       <div><span class="label">充盈係數</span><span class="num" style="color:var(--${rf})">${r.toFixed(2)}</span></div>
     </div>`:`<div class="note">設計混凝土 <span class="num">${f1(designVol(p))}</span> m³，含超灌 <span class="num">${f1(overVol(p))}</span> m³</div>`}
-    ${preList(p)}
     <div class="note">查驗：${ins}</div>
   </article>`;
 }
